@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: doc_editor
+          POSTGRES_PASSWORD: doc_editor_ci
+          POSTGRES_DB: doc_editor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U doc_editor"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://doc_editor:doc_editor_ci@localhost:5432/doc_editor
+      TEST_DATABASE_URL: postgres://doc_editor:doc_editor_ci@localhost:5432/doc_editor_test
+      SESSION_SECRET: ci-session-secret-at-least-16-chars
+      SEED_PASSWORD: ci-seed-password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Create the test database
+        run: psql "$DATABASE_URL" -c "CREATE DATABASE doc_editor_test;"
+
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Migrate and seed the app database
+        run: npm run migrate -w server && npm run seed -w server
+
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
