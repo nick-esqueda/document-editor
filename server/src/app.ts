@@ -13,6 +13,7 @@ import { createUserRouter } from "./routes/userRoutes";
 import { createRequireJsonBody } from "./http/requireJsonBody";
 import { errorHandler } from "./http/errorHandler";
 import { sendError } from "./http/sendError";
+import { serveClientApp } from "./http/serveClientApp";
 
 const TRUSTED_PROXY_HOPS = 1;
 
@@ -23,6 +24,7 @@ export interface AppOptions {
   pool: DbPool;
   sessionSecret: string;
   isProduction: boolean;
+  clientDistDir?: string;
   shouldPruneExpiredSessions?: boolean;
   loginRateLimit?: LoginRateLimit;
 }
@@ -31,9 +33,13 @@ export interface AppOptions {
 export function createApp(options: AppOptions): Express {
   const app = express();
 
-  // In production the app sits behind CloudFront and Caddy, which terminate HTTPS.
+  // In production the app sits behind Render's load balancer, which terminates HTTPS.
   if (options.isProduction) {
     app.set("trust proxy", TRUSTED_PROXY_HOPS);
+  }
+
+  if (options.clientDistDir) {
+    serveClientApp(app, options.clientDistDir);
   }
 
   app.use(express.json({ limit: MAX_SAVE_BODY_BYTES }));

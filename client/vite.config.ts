@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 // In dev, the browser talks only to Vite, which forwards /api to the server.
-// That keeps the app same-origin, just like production behind CloudFront.
+// That keeps the app same-origin, just like production, where Express serves the built app.
 const DEFAULT_API_PROXY_TARGET = "http://localhost:3000";
 const DEV_SERVER_PORT = 5173;
 

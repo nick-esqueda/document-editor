@@ -9,6 +9,8 @@ export interface ServerConfig {
   databaseUrl: string;
   sessionSecret: string;
   isProduction: boolean;
+  /** Folder with the built React app. When set, the server also serves the frontend. */
+  clientDistDir?: string;
 }
 
 type Env = Record<string, string | undefined>;
@@ -52,5 +54,6 @@ export function loadConfig(env: Env = process.env): ServerConfig {
     databaseUrl: env.DATABASE_URL as string,
     sessionSecret: env.SESSION_SECRET as string,
     isProduction: env.NODE_ENV === "production",
+    clientDistDir: env.CLIENT_DIST_DIR || undefined,
   };
 }

@@ -11,6 +11,7 @@ function startServer(): void {
     pool,
     sessionSecret: config.sessionSecret,
     isProduction: config.isProduction,
+    clientDistDir: config.clientDistDir,
   });
 
   app.listen(config.port, () => {
