@@ -81,7 +81,75 @@ Rendered mockups. The layout and wording are what I'll build; colors and spacing
 
 ## Testing
 
-Unit tests on the converters with fixture files: headings, nested lists, bold/italic, raw `<script>` in markdown (comes out as text), Windows line endings, empty file, UTF-8 with BOM, a binary file renamed to `.txt`. API tests for type, size (raw file and converted size) and ownership of the new doc, plus saving an uploaded doc near the limit.
+Every conversion rule gets its own fixture file in `server/test/fixtures/import/` and a test that checks the **exact** stored Tiptap JSON, so what is kept, changed or dropped is pinned down. Each fixture also runs through the real upload endpoint once, so the API and the converter can't drift apart.
+
+**Markdown: kept as-is**
+
+| Input                                          | Expected result                                    |
+| ---------------------------------------------- | -------------------------------------------------- |
+| `# H1`, `## H2`, `### H3`                      | headings level 1, 2, 3                             |
+| `**bold**`, `*italic*`, `__bold__`, `_italic_` | bold / italic marks                                |
+| `***both***`                                   | text with both bold and italic                     |
+| `- a` / `* a` / `+ a` lists                    | bullet list                                        |
+| `1. a` / `3. a` lists                          | numbered list (start number not kept, noted below) |
+| nested bullets inside numbered and the reverse | nested lists at the same depth                     |
+| paragraphs separated by blank lines            | one paragraph each                                 |
+| hard line break (two trailing spaces or `\`)   | line break inside the paragraph                    |
+
+**Markdown: simplified (warning shown)**
+
+| Input                     | Expected result                                         |
+| ------------------------- | ------------------------------------------------------- |
+| `####`, `#####`, `######` | heading level 3, same text                              |
+| fenced and indented code  | plain paragraph(s) with the code text, line breaks kept |
+| `` `inline code` ``       | plain text `inline code` (backticks removed)            |
+| `> quote`                 | plain paragraph with the quote text                     |
+| `[text](https://x.com)`   | `text` only, no link                                    |
+| `![alt](img.png)`         | dropped entirely                                        |
+| table                     | one paragraph per row, cells separated by `\|`          |
+| `~~strike~~`              | `strike` as plain text                                  |
+| `---` horizontal rule     | dropped                                                 |
+| task list `- [ ] todo`    | bullet item with text `[ ] todo`                        |
+| `3.` numbered list start  | list starts at 1                                        |
+
+Each simplified case asserts `warnings > 0`. A file with only supported features asserts `warnings: 0`.
+
+**Markdown: safety**
+
+| Input                                      | Expected result                                  |
+| ------------------------------------------ | ------------------------------------------------ |
+| `<script>alert(1)</script>`                | literal text, no script node                     |
+| `<img src=x onerror=alert(1)>`             | literal text                                     |
+| `<u>under</u>` (markdown has no underline) | literal text `<u>under</u>`                      |
+| `<b>bold?</b>`                             | literal text `<b>bold?</b>`, not bold            |
+| `[x](javascript:alert(1))`                 | `x` as plain text                                |
+| any fixture                                | every node and mark type is in the editor schema |
+
+**Plain text (`.txt`)**
+
+| Input                             | Expected result                                     |
+| --------------------------------- | --------------------------------------------------- |
+| lines separated by blank lines    | one paragraph each                                  |
+| single newlines inside a block    | line breaks, not new paragraphs                     |
+| several blank lines in a row      | treated as one paragraph break, no empty paragraphs |
+| `# not a heading`, `**not bold**` | kept as literal text (no markdown in `.txt`)        |
+| leading/trailing spaces and tabs  | kept                                                |
+| CRLF (Windows) line endings       | same result as LF                                   |
+| UTF-8 BOM                         | BOM removed, text unchanged                         |
+| emoji and accented characters     | kept exactly                                        |
+
+**Both types: edge cases**
+
+| Input                                 | Expected result                                      |
+| ------------------------------------- | ---------------------------------------------------- |
+| empty file / only whitespace          | 201, a document with one empty paragraph             |
+| binary file renamed to `.txt` / `.md` | 400 "doesn't look like a text file", nothing created |
+| invalid UTF-8                         | 400, nothing created                                 |
+| converted JSON over the save limit    | 413, nothing created                                 |
+| filename `notes.MD` (uppercase)       | accepted as markdown                                 |
+| long or empty filename                | title cut to 200 characters / "Untitled document"    |
+
+API tests also cover type, size, ownership of the new doc, and saving an uploaded doc near the limit. A Playwright test uploads one rich `.md` file and checks the editor shows the headings, lists and formatting.
 
 ## Stretch: `.docx`
 
@@ -89,7 +157,7 @@ Same pipeline with mammoth.js as step 3 (`.docx` → HTML → Tiptap JSON). Main
 
 ## Acceptance criteria
 
-- [ ] `npm test` passes, including converter unit tests over `server/test/fixtures/import/` (headings, nested lists, bold/italic, `<script>` in markdown, CRLF, empty file, UTF-8 BOM, binary renamed to `.txt`)
+- [ ] `npm test` passes, including a converter test for every row of the tables in "Testing", each checking the exact stored JSON and the `warnings` count
 - [ ] `curl -b alice -F file=@fixtures/sample.md POST /api/documents/import` → 201 `{id, warnings: 0}`; `GET /api/documents/:id` → content has `heading`, `bulletList`, `bold` nodes/marks and `owner_id` = alice
 - [ ] `sample.txt` upload → paragraphs match the blank-line splits in the file
 - [ ] `<script>alert(1)</script>` inside a `.md` file → stored as literal text; `jq` over the stored JSON finds no node type outside the editor schema
