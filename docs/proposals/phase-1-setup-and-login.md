@@ -71,7 +71,7 @@ session (...)   -- managed by connect-pg-simple
 
 - Identity comes **only** from `req.session.userId`. Request bodies never carry a user id the server trusts.
 - Cookie: `httpOnly`, `sameSite=lax`, `secure` in production. Session id regenerated on login.
-- Same generic error for unknown user and wrong password. Login is rate-limited (10 attempts/min per IP).
+- Same generic error for unknown user and wrong password. Login is rate-limited (10 failed attempts/min per IP; successful logins don't count).
 - API only accepts `application/json` bodies (plus multipart for upload in Phase 4), which together with `sameSite` covers CSRF for this app.
 
 ## Frontend

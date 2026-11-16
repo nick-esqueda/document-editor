@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as authApi from "../src/api/authApi";
+import * as documentsApi from "../src/api/documentsApi";
 import { ApiError } from "../src/api/httpClient";
 import { ALICE, renderAppAt } from "./renderWithAuth";
 
 vi.mock("../src/api/authApi");
+vi.mock("../src/api/documentsApi");
 const mockedAuthApi = vi.mocked(authApi);
+const mockedDocumentsApi = vi.mocked(documentsApi);
 
 async function fillInLoginForm(username: string, password: string) {
   const user = userEvent.setup();
@@ -18,6 +21,7 @@ async function fillInLoginForm(username: string, password: string) {
 beforeEach(() => {
   vi.resetAllMocks();
   mockedAuthApi.fetchCurrentUser.mockResolvedValue(null);
+  mockedDocumentsApi.listDocuments.mockResolvedValue([]);
 });
 
 describe("LoginPage", () => {
@@ -31,7 +35,7 @@ describe("LoginPage", () => {
       username: "alice",
       password: "secret",
     });
-    expect(await screen.findByText("You're logged in")).toBeInTheDocument();
+    expect(await screen.findByText("My documents")).toBeInTheDocument();
   });
 
   it("shows the server's error message on a 401", async () => {
@@ -58,7 +62,7 @@ describe("LoginPage", () => {
     await fillInLoginForm("alice", "secret");
     finishInitialCheck(null);
 
-    expect(await screen.findByText("You're logged in")).toBeInTheDocument();
+    expect(await screen.findByText("My documents")).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Log in" })).toBeNull(),
     );
@@ -87,7 +91,7 @@ describe("RequireAuth", () => {
     mockedAuthApi.fetchCurrentUser.mockResolvedValue(ALICE);
     renderAppAt("/");
 
-    expect(await screen.findByText("You're logged in")).toBeInTheDocument();
+    expect(await screen.findByText("My documents")).toBeInTheDocument();
   });
 });
 
@@ -120,6 +124,6 @@ describe("AppHeader", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn't log out",
     );
-    expect(screen.getByText("You're logged in")).toBeInTheDocument();
+    expect(screen.getByText("My documents")).toBeInTheDocument();
   });
 });

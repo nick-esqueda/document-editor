@@ -11,7 +11,7 @@
 - A `document_access` table records who was given access to which doc.
 - The access check from Phase 2 widens from "owner" to "owner or given access". It's one helper used by every route, so there's a single place to get it right.
 - Only the owner can share, unshare or delete. Shared users get 403 if they try, and everyone else still gets 404.
-- If access is removed while someone has the doc open, their next save fails and they see "You no longer have access."
+- If access is removed while someone has the doc open, their next save fails and they see "You no longer have access." When they go back to the list, the doc is gone from "Shared with me".
 - Two people editing at the same time is handled by Phase 2's version check.
 
 **Deliberately not included:** view-only or comment levels, share links, notifications, transferring ownership.
@@ -91,7 +91,7 @@ Rendered mockups. The layout and wording are what I'll build; colors and spacing
 
 ## Testing
 
-API matrix test covering every row of the rules table for owner, granted user and stranger. Revoke-while-open test. Playwright: Alice shares with Bob, Bob logs in and edits, Alice reopens and sees Bob's change.
+API matrix test covering every row of the rules table for owner, granted user and stranger. Revoke-while-open test, which also checks the revoked user's list no longer includes the doc. Playwright: Alice shares with Bob, Bob logs in and edits, Alice reopens and sees Bob's change.
 
 ## Open questions
 
@@ -104,7 +104,8 @@ API matrix test covering every row of the rules table for owner, granted user an
 - [ ] `curl -b alice POST /api/documents/:id/access -d '{"userId":"<bob>"}'` → 201; repeating it → 200 no-op; sharing with alice herself → 400
 - [ ] `curl -b bob GET /api/documents` → doc appears under `shared` with `ownerName: "Alice"`, not under `owned`
 - [ ] `curl -b bob POST .../access` and `DELETE /api/documents/:id` → 403; `curl -b carol GET /api/documents/:id` → 404
-- [ ] Revoke: alice `DELETE .../access/<bob>` → bob's next `PATCH` → 404
+- [ ] Revoke: alice `DELETE .../access/<bob>` → bob's next `PATCH` → 404, and `curl -b bob GET /api/documents` no longer lists the doc under `shared`
 - [ ] Concurrent edit: alice and bob both `PATCH` from version N → one 200, one 409
 - [ ] Playwright: alice shares with bob → bob logs in, sees it under "Shared with me", edits → alice reopens and sees bob's change
+- [ ] Playwright: bob has the doc open, alice removes his access, bob edits → sees "You no longer have access to this document." → clicks back to the list → the doc is not under "Shared with me"
 - [ ] Playwright: as bob, the editor has no Share or Delete controls and shows "Owned by Alice"
