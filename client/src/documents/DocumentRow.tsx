@@ -36,6 +36,12 @@ export function DocumentRow({
   const closeMenu = useCallback(() => setMode("idle"), []);
   useCloseMenuOnOutsideClick(mode === "menuOpen", menuAreaRefs, closeMenu);
 
+  // The menu item disappears, so focus the ⋮ button first: the dialog returns focus there on close.
+  function closeMenuBeforeDialog() {
+    kebabRef.current?.focus();
+    setMode("idle");
+  }
+
   function handleRenameSubmit(title: string) {
     setMode("idle");
     const trimmedTitle = title.trim();
@@ -86,7 +92,7 @@ export function DocumentRow({
             type="button"
             role="menuitem"
             onClick={() => {
-              setMode("idle");
+              closeMenuBeforeDialog();
               onRequestShare(document);
             }}
           >
@@ -97,7 +103,7 @@ export function DocumentRow({
             role="menuitem"
             className="danger"
             onClick={() => {
-              setMode("idle");
+              closeMenuBeforeDialog();
               onRequestDelete(document);
             }}
           >

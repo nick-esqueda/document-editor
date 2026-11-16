@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import * as authApi from "../src/api/authApi";
 import * as documentsApi from "../src/api/documentsApi";
 import * as usersApi from "../src/api/usersApi";
+import type { DocumentDetails } from "@doc-editor/shared";
 import { ALICE, renderAppAt } from "./renderWithAuth";
 import { buildDocumentDetails, EMPTY_DOCUMENT_LISTS } from "./documentFixtures";
 
@@ -208,6 +209,69 @@ describe("document list", () => {
       screen.getByRole("list", { name: "My documents" }),
     ).getAllByRole("listitem");
     expect(rows[1]).toHaveTextContent("Shared with 1");
+  });
+
+  it("returns focus to the row's menu button when the share dialog closes", async () => {
+    mockedDocumentsApi.fetchDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [],
+    });
+    mockedUsersApi.listUsers.mockResolvedValue([ALICE]);
+    renderAppAt("/");
+
+    const user = await openRowMenu(OLDER.title);
+    await user.click(screen.getByRole("menuitem", { name: "Share" }));
+    await user.keyboard("{Escape}");
+
+    expect(
+      screen.getByRole("button", { name: `More actions for ${OLDER.title}` }),
+    ).toHaveFocus();
+  });
+
+  it("keeps a share count that changed while a rename was saving", async () => {
+    let finishRename: (value: DocumentDetails) => void = () => {};
+    mockedDocumentsApi.fetchDocument.mockResolvedValue(
+      buildDocumentDetails({ ...OLDER, version: 4 }),
+    );
+    mockedDocumentsApi.updateDocument.mockReturnValue(
+      new Promise((resolve) => (finishRename = resolve)),
+    );
+    const bob = { id: "user-bob", username: "bob", displayName: "Bob" };
+    mockedDocumentsApi.fetchDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [],
+    });
+    mockedDocumentsApi.grantDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [bob],
+    });
+    mockedUsersApi.listUsers.mockResolvedValue([ALICE, bob]);
+    renderAppAt("/");
+
+    const user = await openRowMenu(OLDER.title);
+    await user.click(screen.getByRole("menuitem", { name: "Rename" }));
+    await user.clear(screen.getByLabelText("New title"));
+    await user.type(screen.getByLabelText("New title"), "Books{Enter}");
+    await user.click(
+      screen.getByRole("button", { name: `More actions for ${OLDER.title}` }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Share" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.selectOptions(
+      await within(dialog).findByLabelText("Add people"),
+      "Bob",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await within(dialog).findByRole("button", { name: "Remove Bob" });
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    finishRename(
+      buildDocumentDetails({ ...OLDER, title: "Books", version: 5 }),
+    );
+
+    const renamedRow = (
+      await screen.findByRole("link", { name: "Books" })
+    ).closest("li") as HTMLElement;
+    expect(renamedRow).toHaveTextContent("Shared with 1");
   });
 
   it("keeps the document when delete is cancelled", async () => {

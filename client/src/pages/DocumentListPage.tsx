@@ -46,8 +46,10 @@ export function DocumentListPage() {
 
   async function handleRename(document: OwnedDocumentSummary, title: string) {
     await runAction(async () => {
-      const renamed = await fetchVersionThenRename(document, title);
-      updateOwnedDocuments((current) => moveToTop(current, renamed));
+      const renamedFields = await fetchVersionThenRename(document.id, title);
+      updateOwnedDocuments((current) =>
+        moveToTop(current, document.id, renamedFields),
+      );
     });
   }
 
@@ -224,24 +226,32 @@ function useDocumentLists() {
 }
 
 /** Renames need the current version for conflict checking, which the list doesn't carry. */
+type RenamedFields = Pick<OwnedDocumentSummary, "title" | "updatedAt">;
+
 async function fetchVersionThenRename(
-  document: OwnedDocumentSummary,
+  documentId: string,
   title: string,
-): Promise<OwnedDocumentSummary> {
-  const current = await fetchDocument(document.id);
-  const renamed = await updateDocument(document.id, {
+): Promise<RenamedFields> {
+  const current = await fetchDocument(documentId);
+  const renamed = await updateDocument(documentId, {
     version: current.version,
     title,
   });
 
-  return { ...document, title: renamed.title, updatedAt: renamed.updatedAt };
+  return { title: renamed.title, updatedAt: renamed.updatedAt };
 }
 
-/** Replaces the renamed document and moves it to the top, since it was just edited. */
+/**
+ * Applies the renamed fields to the latest copy of the row (so a share count
+ * that changed meanwhile is kept) and moves it to the top, since it was just edited.
+ */
 function moveToTop(
   documents: OwnedDocumentSummary[],
-  updated: OwnedDocumentSummary,
+  documentId: string,
+  renamedFields: RenamedFields,
 ): OwnedDocumentSummary[] {
-  const others = documents.filter((document) => document.id !== updated.id);
-  return [updated, ...others];
+  const latest = documents.find((document) => document.id === documentId);
+  const others = documents.filter((document) => document.id !== documentId);
+
+  return latest ? [{ ...latest, ...renamedFields }, ...others] : others;
 }
