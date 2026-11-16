@@ -9,6 +9,7 @@
 **How it's built:**
 
 - The file goes to the server, which checks the type and size and rejects anything that isn't real text.
+- After conversion, the new document must also fit the normal document size limit (the same one every save uses). Converted JSON is larger than the raw text, so a file just under 1 MB can be rejected with a clear "too large once converted" message. This means an uploaded doc can always be edited and saved afterwards.
 - Markdown is converted with markdown-it, with raw HTML turned off, then into Tiptap JSON. Plain text becomes paragraphs.
 - The result passes the same schema check as normal saves, so an upload can't sneak in anything the editor wouldn't allow.
 - Markdown features the editor doesn't support are simplified, not lost silently. Tables become text, H4-H6 become H3, and images are dropped. A note tells you when this happened.
@@ -39,14 +40,16 @@ browser ──multipart──▶ POST /api/documents/import
                           │      .txt → paragraphs split on blank lines,
                           │             single newlines become line breaks
                           │ 4. validate against the shared editor schema (same as Phase 2)
-                          │ 5. insert document, owner = session user
+                          │ 5. check the converted JSON fits the normal save limit, else 413
+                          │ 6. insert document, owner = session user
                           ▼
                        201 { id }  → browser opens /d/:id
 ```
 
 - **Conversion happens on the server**, using Tiptap's server-side `generateJSON` with the same extension list as the editor. Stored content is always valid editor JSON.
 - **`html: false` in markdown-it** means raw HTML inside markdown is treated as text, never executed. The schema step is a second safety net.
-- **Title** = filename without extension (e.g. `meeting-notes.md` → "meeting-notes").
+- **Title** = filename without extension (e.g. `meeting-notes.md` → "meeting-notes"), trimmed and cut to the normal 200-character title limit. An empty name becomes "Untitled document".
+- **Size limits match normal documents.** A normal save can be at most 1 MB of JSON (title + content), and a title at most 200 characters. The 1 MB file check runs first to reject big files cheaply. The converted content is then checked against the save limit, using one shared constant with a little room left for the title and version. Without this, an upload could create a document whose every later save fails with 413.
 - **Lossy by design:** markdown features the editor doesn't support are simplified. H4-H6 → H3, code blocks and blockquotes → paragraphs, tables → text, links → link text, images → dropped. The upload response includes a `warnings` count, and the UI shows _"Some formatting wasn't supported and was simplified."_
 - multer with memory storage and a 1 MB limit. Nothing is written to disk.
 
@@ -78,7 +81,7 @@ Rendered mockups. The layout and wording are what I'll build; colors and spacing
 
 ## Testing
 
-Unit tests on the converters with fixture files: headings, nested lists, bold/italic, raw `<script>` in markdown (comes out as text), Windows line endings, empty file, UTF-8 with BOM, a binary file renamed to `.txt`. API tests for type, size and ownership of the new doc.
+Unit tests on the converters with fixture files: headings, nested lists, bold/italic, raw `<script>` in markdown (comes out as text), Windows line endings, empty file, UTF-8 with BOM, a binary file renamed to `.txt`. API tests for type, size (raw file and converted size) and ownership of the new doc, plus saving an uploaded doc near the limit.
 
 ## Stretch: `.docx`
 
@@ -92,5 +95,8 @@ Same pipeline with mammoth.js as step 3 (`.docx` → HTML → Tiptap JSON). Main
 - [ ] `<script>alert(1)</script>` inside a `.md` file → stored as literal text; `jq` over the stored JSON finds no node type outside the editor schema
 - [ ] Markdown with a table and an H5 → 201 with `warnings > 0`; H5 stored as H3
 - [ ] `report.docx` → 400; 2 MB `.md` → 413; PNG renamed to `.txt` → 400; no cookie → 401
+- [ ] A `.md` file under 1 MB whose converted JSON exceeds the save limit (e.g. ~900 KB of one-word bullet lines) → 413 "too large once converted", and no document is created
+- [ ] An upload just under the converted limit → 201, and a normal `PATCH` save of that document afterwards → 200
+- [ ] A 250-character filename → title is cut to 200 characters
 - [ ] `grep -n "txt" README.md` shows the supported-types line
 - [ ] Playwright: Upload button opens a picker limited to `.txt,.md`; uploading `sample.md` opens the new doc in the editor; uploading `report.docx` shows the "isn't supported" toast
