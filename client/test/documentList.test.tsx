@@ -3,13 +3,17 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as authApi from "../src/api/authApi";
 import * as documentsApi from "../src/api/documentsApi";
+import * as usersApi from "../src/api/usersApi";
+import type { DocumentDetails } from "@doc-editor/shared";
 import { ALICE, renderAppAt } from "./renderWithAuth";
-import { buildDocumentDetails } from "./documentFixtures";
+import { buildDocumentDetails, EMPTY_DOCUMENT_LISTS } from "./documentFixtures";
 
 vi.mock("../src/api/authApi");
 vi.mock("../src/api/documentsApi");
+vi.mock("../src/api/usersApi");
 const mockedAuthApi = vi.mocked(authApi);
 const mockedDocumentsApi = vi.mocked(documentsApi);
+const mockedUsersApi = vi.mocked(usersApi);
 
 const MINUTE_MS = 60 * 1000;
 const NOW = Date.now();
@@ -18,12 +22,24 @@ const NEWER = {
   id: "doc-new",
   title: "Q3 planning notes",
   updatedAt: new Date(NOW - 2 * MINUTE_MS).toISOString(),
+  sharedWithCount: 2,
 };
 const OLDER = {
   id: "doc-old",
   title: "Reading list",
   updatedAt: new Date(NOW - 90 * MINUTE_MS).toISOString(),
+  sharedWithCount: 0,
 };
+const SHARED_BY_BOB = {
+  id: "doc-bob",
+  title: "Team retro",
+  updatedAt: new Date(NOW - 60 * MINUTE_MS).toISOString(),
+  ownerName: "Bob",
+};
+
+function findList(name: string) {
+  return screen.findByRole("list", { name });
+}
 
 async function openRowMenu(title: string) {
   const user = userEvent.setup();
@@ -36,14 +52,19 @@ async function openRowMenu(title: string) {
 beforeEach(() => {
   vi.resetAllMocks();
   mockedAuthApi.fetchCurrentUser.mockResolvedValue(ALICE);
-  mockedDocumentsApi.listDocuments.mockResolvedValue([NEWER, OLDER]);
+  mockedDocumentsApi.listDocuments.mockResolvedValue({
+    owned: [NEWER, OLDER],
+    shared: [SHARED_BY_BOB],
+  });
 });
 
 describe("document list", () => {
   it("shows documents in the order the server returns (newest first) with edited times", async () => {
     renderAppAt("/");
 
-    const rows = await screen.findAllByRole("listitem");
+    const rows = within(await findList("My documents")).getAllByRole(
+      "listitem",
+    );
 
     expect(
       rows.map((row) => within(row).getByRole("link").textContent),
@@ -53,10 +74,46 @@ describe("document list", () => {
   });
 
   it("shows the empty state when there are no documents", async () => {
-    mockedDocumentsApi.listDocuments.mockResolvedValue([]);
+    mockedDocumentsApi.listDocuments.mockResolvedValue(EMPTY_DOCUMENT_LISTS);
     renderAppAt("/");
 
     expect(await screen.findByText(/No documents yet/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Nothing has been shared with you yet."),
+    ).toBeInTheDocument();
+  });
+
+  it("lists documents shared with me separately, with who shared them", async () => {
+    renderAppAt("/");
+
+    const sharedList = await findList("Shared with me");
+    const myList = screen.getByRole("list", { name: "My documents" });
+
+    expect(
+      screen.getByRole("heading", { name: "Shared with me" }),
+    ).toBeInTheDocument();
+    expect(sharedList).toHaveTextContent("Team retro");
+    expect(sharedList).toHaveTextContent("from Bob");
+    expect(myList).not.toHaveTextContent("Team retro");
+  });
+
+  it("shows how many people an owned document is shared with", async () => {
+    renderAppAt("/");
+
+    const rows = within(await findList("My documents")).getAllByRole(
+      "listitem",
+    );
+
+    expect(rows[0]).toHaveTextContent("Shared with 2");
+    expect(rows[1]).not.toHaveTextContent("Shared with");
+  });
+
+  it("has no rename or delete menu on shared documents", async () => {
+    renderAppAt("/");
+
+    const sharedList = await findList("Shared with me");
+
+    expect(within(sharedList).queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("creates a document and opens it in the editor", async () => {
@@ -118,6 +175,103 @@ describe("document list", () => {
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("shares from the row menu and updates the shared count", async () => {
+    const bob = { id: "user-bob", username: "bob", displayName: "Bob" };
+    mockedDocumentsApi.fetchDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [],
+    });
+    mockedDocumentsApi.grantDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [bob],
+    });
+    mockedUsersApi.listUsers.mockResolvedValue([ALICE, bob]);
+    renderAppAt("/");
+
+    const user = await openRowMenu(OLDER.title);
+    await user.click(screen.getByRole("menuitem", { name: "Share" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(`Share "${OLDER.title}"`);
+    await user.selectOptions(
+      await within(dialog).findByLabelText("Add people"),
+      "Bob",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    expect(mockedDocumentsApi.grantDocumentAccess).toHaveBeenCalledWith(
+      OLDER.id,
+      bob.id,
+    );
+    const rows = within(
+      screen.getByRole("list", { name: "My documents" }),
+    ).getAllByRole("listitem");
+    expect(rows[1]).toHaveTextContent("Shared with 1");
+  });
+
+  it("returns focus to the row's menu button when the share dialog closes", async () => {
+    mockedDocumentsApi.fetchDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [],
+    });
+    mockedUsersApi.listUsers.mockResolvedValue([ALICE]);
+    renderAppAt("/");
+
+    const user = await openRowMenu(OLDER.title);
+    await user.click(screen.getByRole("menuitem", { name: "Share" }));
+    await user.keyboard("{Escape}");
+
+    expect(
+      screen.getByRole("button", { name: `More actions for ${OLDER.title}` }),
+    ).toHaveFocus();
+  });
+
+  it("keeps a share count that changed while a rename was saving", async () => {
+    let finishRename: (value: DocumentDetails) => void = () => {};
+    mockedDocumentsApi.fetchDocument.mockResolvedValue(
+      buildDocumentDetails({ ...OLDER, version: 4 }),
+    );
+    mockedDocumentsApi.updateDocument.mockReturnValue(
+      new Promise((resolve) => (finishRename = resolve)),
+    );
+    const bob = { id: "user-bob", username: "bob", displayName: "Bob" };
+    mockedDocumentsApi.fetchDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [],
+    });
+    mockedDocumentsApi.grantDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [bob],
+    });
+    mockedUsersApi.listUsers.mockResolvedValue([ALICE, bob]);
+    renderAppAt("/");
+
+    const user = await openRowMenu(OLDER.title);
+    await user.click(screen.getByRole("menuitem", { name: "Rename" }));
+    await user.clear(screen.getByLabelText("New title"));
+    await user.type(screen.getByLabelText("New title"), "Books{Enter}");
+    await user.click(
+      screen.getByRole("button", { name: `More actions for ${OLDER.title}` }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Share" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.selectOptions(
+      await within(dialog).findByLabelText("Add people"),
+      "Bob",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await within(dialog).findByRole("button", { name: "Remove Bob" });
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    finishRename(
+      buildDocumentDetails({ ...OLDER, title: "Books", version: 5 }),
+    );
+
+    const renamedRow = (
+      await screen.findByRole("link", { name: "Books" })
+    ).closest("li") as HTMLElement;
+    expect(renamedRow).toHaveTextContent("Shared with 1");
   });
 
   it("keeps the document when delete is cancelled", async () => {

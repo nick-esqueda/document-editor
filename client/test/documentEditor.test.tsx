@@ -5,7 +5,10 @@ import * as authApi from "../src/api/authApi";
 import * as documentsApi from "../src/api/documentsApi";
 import { ApiError } from "../src/api/httpClient";
 import { ALICE, renderAppAt } from "./renderWithAuth";
-import { buildDocumentWithText } from "./documentFixtures";
+import {
+  buildDocumentWithText,
+  EMPTY_DOCUMENT_LISTS,
+} from "./documentFixtures";
 
 vi.mock("../src/api/authApi");
 vi.mock("../src/api/documentsApi");
@@ -212,7 +215,7 @@ describe("document editor", () => {
   });
 
   it("saves pending edits when going back to the document list", async () => {
-    mockedDocumentsApi.listDocuments.mockResolvedValue([]);
+    mockedDocumentsApi.listDocuments.mockResolvedValue(EMPTY_DOCUMENT_LISTS);
     mockedDocumentsApi.updateDocument.mockResolvedValue({
       ...SAVED_DOCUMENT,
       version: 8,
@@ -239,7 +242,7 @@ describe("document editor", () => {
   ])(
     "asks before going back to the list when %s stopped the save",
     async (_label, saveError) => {
-      mockedDocumentsApi.listDocuments.mockResolvedValue([]);
+      mockedDocumentsApi.listDocuments.mockResolvedValue(EMPTY_DOCUMENT_LISTS);
       mockedDocumentsApi.updateDocument.mockRejectedValue(saveError);
       const user = userEvent.setup();
       await openEditor();

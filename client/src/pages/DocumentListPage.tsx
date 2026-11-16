@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import type { DocumentSummary } from "@doc-editor/shared";
+import type {
+  DocumentAccessResponse,
+  DocumentListResponse,
+  OwnedDocumentSummary,
+  SharedDocumentSummary,
+} from "@doc-editor/shared";
 import {
   createDocument,
   deleteDocument,
@@ -11,18 +16,26 @@ import {
 import { AppHeader } from "../components/AppHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DocumentRow } from "../documents/DocumentRow";
+import { SharedDocumentRow } from "../documents/SharedDocumentRow";
+import { ShareDialog } from "../sharing/ShareDialog";
 import { buildDocumentPath } from "../routes";
 
 const LOAD_FAILED_MESSAGE =
   "Your documents couldn't be loaded. Please refresh the page.";
 const ACTION_FAILED_MESSAGE = "That didn't work. Please try again.";
 
+type OwnedDocumentsUpdate = (
+  documents: OwnedDocumentSummary[],
+) => OwnedDocumentSummary[];
+
 export function DocumentListPage() {
   const navigate = useNavigate();
-  const { documents, setDocuments, errorMessage, setErrorMessage } =
-    useDocumentList();
+  const { lists, updateOwnedDocuments, errorMessage, setErrorMessage } =
+    useDocumentLists();
   const [documentToDelete, setDocumentToDelete] =
-    useState<DocumentSummary | null>(null);
+    useState<OwnedDocumentSummary | null>(null);
+  const [documentToShare, setDocumentToShare] =
+    useState<OwnedDocumentSummary | null>(null);
 
   async function handleCreate() {
     await runAction(async () => {
@@ -31,23 +44,39 @@ export function DocumentListPage() {
     });
   }
 
-  async function handleRename(document: DocumentSummary, title: string) {
+  async function handleRename(document: OwnedDocumentSummary, title: string) {
     await runAction(async () => {
-      const full = await fetchVersionThenRename(document.id, title);
-      setDocuments((current) => replaceDocument(current ?? [], full));
+      const renamedFields = await fetchVersionThenRename(document.id, title);
+      updateOwnedDocuments((current) =>
+        moveToTop(current, document.id, renamedFields),
+      );
     });
   }
 
   async function handleConfirmDelete() {
-    const target = documentToDelete as DocumentSummary;
+    const target = documentToDelete as OwnedDocumentSummary;
     setDocumentToDelete(null);
 
     await runAction(async () => {
       await deleteDocument(target.id);
-      setDocuments((current) =>
-        (current ?? []).filter((document) => document.id !== target.id),
+      updateOwnedDocuments((current) =>
+        current.filter((document) => document.id !== target.id),
       );
     });
+  }
+
+  function handleAccessChange(
+    documentId: string,
+    access: DocumentAccessResponse,
+  ) {
+    const sharedWithCount = access.people.length;
+    updateOwnedDocuments((current) =>
+      current.map((document) =>
+        document.id === documentId
+          ? { ...document, sharedWithCount }
+          : document,
+      ),
+    );
   }
 
   async function runAction(action: () => Promise<void>) {
@@ -79,16 +108,31 @@ export function DocumentListPage() {
             {errorMessage}
           </p>
         )}
-        <DocumentListBody
-          documents={documents}
+        <OwnedDocumentList
+          documents={lists?.owned ?? null}
           onRename={handleRename}
+          onRequestShare={setDocumentToShare}
           onRequestDelete={setDocumentToDelete}
         />
+        <div className="section-head shared-section-head">
+          <h2>Shared with me</h2>
+        </div>
+        <SharedDocumentList documents={lists?.shared ?? null} />
       </main>
+      {documentToShare && (
+        <ShareDialog
+          documentId={documentToShare.id}
+          documentTitle={documentToShare.title}
+          onClose={() => setDocumentToShare(null)}
+          onAccessChange={(access) =>
+            handleAccessChange(documentToShare.id, access)
+          }
+        />
+      )}
       {documentToDelete && (
         <ConfirmDialog
           title={`Delete "${documentToDelete.title}"?`}
-          message="This permanently deletes the document. It can't be undone."
+          message="This permanently deletes the document for everyone it's shared with. It can't be undone."
           confirmLabel="Delete"
           onConfirm={handleConfirmDelete}
           onCancel={() => setDocumentToDelete(null)}
@@ -98,17 +142,19 @@ export function DocumentListPage() {
   );
 }
 
-interface DocumentListBodyProps {
-  documents: DocumentSummary[] | null;
-  onRename: (document: DocumentSummary, title: string) => void;
-  onRequestDelete: (document: DocumentSummary) => void;
+interface OwnedDocumentListProps {
+  documents: OwnedDocumentSummary[] | null;
+  onRename: (document: OwnedDocumentSummary, title: string) => void;
+  onRequestShare: (document: OwnedDocumentSummary) => void;
+  onRequestDelete: (document: OwnedDocumentSummary) => void;
 }
 
-function DocumentListBody({
+function OwnedDocumentList({
   documents,
   onRename,
+  onRequestShare,
   onRequestDelete,
-}: DocumentListBodyProps) {
+}: OwnedDocumentListProps) {
   if (documents === null) {
     return <p className="loading">Loading…</p>;
   }
@@ -122,12 +168,13 @@ function DocumentListBody({
   }
 
   return (
-    <ul className="document-rows">
+    <ul className="document-rows" aria-label="My documents">
       {documents.map((document) => (
         <DocumentRow
           key={document.id}
           document={document}
           onRename={onRename}
+          onRequestShare={onRequestShare}
           onRequestDelete={onRequestDelete}
         />
       ))}
@@ -135,34 +182,76 @@ function DocumentListBody({
   );
 }
 
-function useDocumentList() {
-  const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
+function SharedDocumentList({
+  documents,
+}: {
+  documents: SharedDocumentSummary[] | null;
+}) {
+  if (documents === null) {
+    return null;
+  }
+
+  if (documents.length === 0) {
+    return (
+      <div className="empty-state">Nothing has been shared with you yet.</div>
+    );
+  }
+
+  return (
+    <ul className="document-rows" aria-label="Shared with me">
+      {documents.map((document) => (
+        <SharedDocumentRow key={document.id} document={document} />
+      ))}
+    </ul>
+  );
+}
+
+function useDocumentLists() {
+  const [lists, setLists] = useState<DocumentListResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     listDocuments()
-      .then(setDocuments)
+      .then(setLists)
       .catch(() => setErrorMessage(LOAD_FAILED_MESSAGE));
   }, []);
 
-  return { documents, setDocuments, errorMessage, setErrorMessage };
+  function updateOwnedDocuments(update: OwnedDocumentsUpdate) {
+    setLists((current) =>
+      current ? { ...current, owned: update(current.owned) } : current,
+    );
+  }
+
+  return { lists, updateOwnedDocuments, errorMessage, setErrorMessage };
 }
 
 /** Renames need the current version for conflict checking, which the list doesn't carry. */
+type RenamedFields = Pick<OwnedDocumentSummary, "title" | "updatedAt">;
+
 async function fetchVersionThenRename(
   documentId: string,
   title: string,
-): Promise<DocumentSummary> {
+): Promise<RenamedFields> {
   const current = await fetchDocument(documentId);
-  return updateDocument(documentId, { version: current.version, title });
+  const renamed = await updateDocument(documentId, {
+    version: current.version,
+    title,
+  });
+
+  return { title: renamed.title, updatedAt: renamed.updatedAt };
 }
 
-/** Replaces the renamed document and moves it to the top, since it was just edited. */
-function replaceDocument(
-  documents: DocumentSummary[],
-  updated: DocumentSummary,
-): DocumentSummary[] {
-  const others = documents.filter((document) => document.id !== updated.id);
-  const { id, title, updatedAt } = updated;
-  return [{ id, title, updatedAt }, ...others];
+/**
+ * Applies the renamed fields to the latest copy of the row (so a share count
+ * that changed meanwhile is kept) and moves it to the top, since it was just edited.
+ */
+function moveToTop(
+  documents: OwnedDocumentSummary[],
+  documentId: string,
+  renamedFields: RenamedFields,
+): OwnedDocumentSummary[] {
+  const latest = documents.find((document) => document.id === documentId);
+  const others = documents.filter((document) => document.id !== documentId);
+
+  return latest ? [{ ...latest, ...renamedFields }, ...others] : others;
 }

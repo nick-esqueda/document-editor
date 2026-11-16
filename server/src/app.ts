@@ -8,6 +8,7 @@ import {
 } from "./auth/loginRateLimiter";
 import { createAuthRouter } from "./routes/authRoutes";
 import { createDocumentRouter } from "./routes/documentRoutes";
+import { createUserRouter } from "./routes/userRoutes";
 import { requireJsonBody } from "./http/requireJsonBody";
 import { errorHandler } from "./http/errorHandler";
 import { sendError } from "./http/sendError";
@@ -53,6 +54,7 @@ export function createApp(options: AppOptions): Express {
     }),
   );
   app.use("/api/documents", createDocumentRouter(options.pool));
+  app.use("/api/users", createUserRouter(options.pool));
   app.use("/api", (_request, response) =>
     sendError(response, 404, "Not found"),
   );

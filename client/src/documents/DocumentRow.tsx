@@ -7,14 +7,18 @@ import {
   type RefObject,
 } from "react";
 import { Link } from "react-router";
-import { MAX_TITLE_LENGTH, type DocumentSummary } from "@doc-editor/shared";
+import {
+  MAX_TITLE_LENGTH,
+  type OwnedDocumentSummary,
+} from "@doc-editor/shared";
 import { buildDocumentPath } from "../routes";
 import { formatEditedTime } from "./formatEditedTime";
 
 interface DocumentRowProps {
-  document: DocumentSummary;
-  onRename: (document: DocumentSummary, title: string) => void;
-  onRequestDelete: (document: DocumentSummary) => void;
+  document: OwnedDocumentSummary;
+  onRename: (document: OwnedDocumentSummary, title: string) => void;
+  onRequestShare: (document: OwnedDocumentSummary) => void;
+  onRequestDelete: (document: OwnedDocumentSummary) => void;
 }
 
 type RowMode = "idle" | "menuOpen" | "renaming";
@@ -22,6 +26,7 @@ type RowMode = "idle" | "menuOpen" | "renaming";
 export function DocumentRow({
   document,
   onRename,
+  onRequestShare,
   onRequestDelete,
 }: DocumentRowProps) {
   const [mode, setMode] = useState<RowMode>("idle");
@@ -30,6 +35,12 @@ export function DocumentRow({
   const [menuAreaRefs] = useState(() => [kebabRef, menuRef]);
   const closeMenu = useCallback(() => setMode("idle"), []);
   useCloseMenuOnOutsideClick(mode === "menuOpen", menuAreaRefs, closeMenu);
+
+  // The menu item disappears, so focus the ⋮ button first: the dialog returns focus there on close.
+  function closeMenuBeforeDialog() {
+    kebabRef.current?.focus();
+    setMode("idle");
+  }
 
   function handleRenameSubmit(title: string) {
     setMode("idle");
@@ -52,6 +63,9 @@ export function DocumentRow({
         <Link className="document-title" to={buildDocumentPath(document.id)}>
           {document.title}
         </Link>
+      )}
+      {document.sharedWithCount > 0 && (
+        <span className="pill">👥 Shared with {document.sharedWithCount}</span>
       )}
       <span className="spacer" />
       <span className="meta">{formatEditedTime(document.updatedAt)}</span>
@@ -77,9 +91,19 @@ export function DocumentRow({
           <button
             type="button"
             role="menuitem"
+            onClick={() => {
+              closeMenuBeforeDialog();
+              onRequestShare(document);
+            }}
+          >
+            Share
+          </button>
+          <button
+            type="button"
+            role="menuitem"
             className="danger"
             onClick={() => {
-              setMode("idle");
+              closeMenuBeforeDialog();
               onRequestDelete(document);
             }}
           >
