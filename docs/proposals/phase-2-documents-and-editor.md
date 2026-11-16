@@ -15,7 +15,7 @@
 
 **Deliberately not included:** sharing, upload, comments, version history, images, tables, links.
 
-**Decision for you:** should owners be able to delete docs? I'll include owner-only delete with a confirm dialog unless you say no.
+**Decided:** owners can delete their own docs (with a confirm dialog), even when shared. Nobody else can.
 
 ---
 
@@ -98,7 +98,7 @@ API tests: create/list/get/patch; another user gets 404 on every route; invalid 
 
 ## Open questions
 
-- **Delete:** include owner-only delete? *Default: yes.*
+- ~~**Delete:** include owner-only delete?~~ **Decided (Nick):** yes. Only the owner can delete, even when the doc is shared. Deleting a shared doc removes it for everyone it was shared with.
 - **Trash/undo delete:** *Default: no, a confirm dialog is enough.*
 
 ## Acceptance criteria
