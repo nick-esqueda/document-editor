@@ -22,6 +22,12 @@ describe("loadConfig", () => {
     });
   });
 
+  it("reads the optional folder of the built frontend", () => {
+    const config = loadConfig({ ...VALID_ENV, CLIENT_DIST_DIR: "/app/dist" });
+
+    expect(config.clientDistDir).toBe("/app/dist");
+  });
+
   it.each([
     [
       "DATABASE_URL is missing",

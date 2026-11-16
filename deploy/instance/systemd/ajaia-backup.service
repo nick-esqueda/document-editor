@@ -1,8 +1,0 @@
-[Unit]
-Description=Back up the Ajaia Doc Editor database to S3
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-ExecStart=/opt/ajaia/current/deploy/instance/backup-database.sh

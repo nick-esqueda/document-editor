@@ -1,77 +1,76 @@
-# Phase 5: Deploy to AWS + README
+# Phase 5: Deploy to Render + README
 
-**Goal:** the app runs on AWS at a public HTTPS URL, and the README lets anyone run it locally or redeploy it.
+**Goal:** the app runs at a public HTTPS URL, and the README lets anyone run it locally or redeploy it.
 
 ## Summary (1-2 min read)
 
-**What you get:** the app live on AWS at an HTTPS URL, plus a README that explains what it is, how to run it locally in a few minutes, how it's built, and how to redeploy.
+**What you get:** the app live at https://ajaia.nickesqueda.com, redeployed automatically on every push to `main`, plus a README that explains what it is, how to run it locally in a few minutes, how it's built, and how to deploy it.
 
 **How it's built:**
 
-- CloudFront is the single front door. It serves the React app from a private S3 bucket and forwards `/api/*` to the server, so the login cookie just works with no cross-site setup.
-- One EC2 instance (t4g.small) runs the API, Postgres and Caddy (for HTTPS) in Docker, the same way it runs locally.
-- Only ports 80 and 443 are open. Admin access uses AWS Session Manager instead of SSH, and secrets live in AWS Parameter Store, not in git.
-- A nightly database backup goes to S3, kept for 14 days.
-- Two scripts deploy the frontend and backend. Automatic deploys from GitHub can come later.
-- Cost is about $19 a month.
+- One Render web service runs the existing Docker image. The Express server also serves the built React app, so pages and `/api/*` share one origin and the login cookie just works.
+- A Render managed Postgres database holds the data. It isn't reachable from the internet, and Render handles its backups.
+- `render.yaml` (a Render Blueprint) describes both, so setup is a few clicks in the Render dashboard.
+- Render generates `SESSION_SECRET` and the demo password on first deploy. Neither is in git.
+- HTTPS is automatic, including for the custom domain. You add one CNAME record.
+- Cost is about $13 a month (web service $7, Postgres $6).
 
-**Deliberately not included:** autoscaling, managed database (RDS), multiple regions, zero-downtime deploys, Terraform.
+**Deliberately not included:** AWS, Terraform, autoscaling, multiple regions, staging environments.
 
-**Decisions (confirmed by Nick):** app at `ajaia.nickesqueda.com`, server at `api.ajaia.nickesqueda.com`, region `us-east-2`, DNS records added by Nick outside AWS, Nick runs the AWS steps from [docs/deploy/aws-setup.md](../deploy/aws-setup.md).
+**Decisions (confirmed by Nick):** Render instead of AWS, app at `ajaia.nickesqueda.com`, region Ohio (US East), DNS record added by Nick outside Render, Nick does the Render setup from [docs/deploy/render-setup.md](../deploy/render-setup.md).
 
 ---
 
 ## Scope
 
-S3 + CloudFront for the frontend, one EC2 instance running the API and Postgres in Docker, HTTPS, secrets handling, nightly database backup, deploy script, README.
+Production Docker image that serves both the API and the frontend, Render Blueprint, custom domain, secrets handling, setup steps, README.
 
 ## Out of scope
 
-Autoscaling, RDS, multi-region, blue/green deploys. Easy to add later; not worth it at this size.
+AWS (replaced by Render), infrastructure as code beyond `render.yaml`, autoscaling, multi-region, staging or preview environments, custom backup jobs (Render's managed backups are used), the Phase 4 upload code.
 
 ## Architecture
 
 ```text
-                         ┌───────────────────────────── AWS ─────────────────────────────┐
-                         │                                                               │
- Browser ──HTTPS──▶  CloudFront (one domain)                                            │
-                         │   ├─ /*      ─▶ S3 bucket (private, OAC)   React build        │
-                         │   └─ /api/*  ─▶ EC2 t4g.small ──────────────────────────┐    │
-                         │                 │ Caddy :443 (TLS, Let's Encrypt)       │    │
-                         │                 │   └▶ api container (Express :3000)    │    │
-                         │                 │        └▶ postgres container (EBS vol)│    │
-                         │                 └───────────────────────────────────────┘    │
-                         │                         nightly pg_dump ─▶ S3 backups bucket │
-                         └───────────────────────────────────────────────────────────────┘
+ Browser ──HTTPS──▶ ajaia.nickesqueda.com (CNAME → Render, automatic certificate)
+                         │
+                         ▼
+               Render web service (Docker, Ohio)
+               Express :PORT
+                 ├─ /api/*   → API routes
+                 ├─ /assets/* → hashed JS/CSS (cached 1 year)
+                 └─ other    → index.html (React Router takes over)
+                         │  private network only
+                         ▼
+               Render Postgres 16 (managed backups)
 ```
 
-**Why one CloudFront domain for both:** the session cookie is first-party, there's no CORS to configure, and it matches local dev (Vite proxies `/api`).
+**Why one service for both:** the session cookie is first-party, there's no CORS to configure, and it matches local dev (Vite proxies `/api`).
 
 ## Details
 
-**CloudFront**
+**Docker image** (`Dockerfile`)
 
-- `/api/*` behavior: caching disabled, all HTTP methods, forwards cookies, query strings and the `Content-Type` header.
-- SPA routing: a small CloudFront Function rewrites non-`/api`, non-file paths (like `/d/123`) to `/index.html`. We avoid "custom error page → index.html" because it would also turn real API 404s into HTML.
-- Hashed asset files cached for a year; `index.html` not cached.
+- Stage 1 installs the client and shared workspaces and runs `vite build`.
+- Stage 2 installs only the server's runtime dependencies and copies in `client/dist`. It sets `CLIENT_DIST_DIR`, which tells the server to serve the frontend.
+- On start: migrations, then the seed (safe to re-run; keeps the demo password in sync with `SEED_PASSWORD`), then the server.
 
-**EC2**
+**Serving the frontend** (`server/src/http/serveClientApp.ts`)
 
-- t4g.small (2 vCPU, 2 GB, ARM), Amazon Linux 2023, 20 GB gp3 disk. Docker + Compose.
-- `docker-compose.prod.yml`: `caddy`, `api`, `postgres`. Postgres has no public port.
-- Security group: 443 from CloudFront's IP ranges only (AWS managed prefix list), 80 open for certificate renewal. No SSH port: shell access through SSM Session Manager.
-- CloudFront sends a secret `X-Origin-Verify` header to the server. Caddy refuses anything without it with a 403, so the API can't be reached around CloudFront.
-- Secrets (`SESSION_SECRET`, DB password) in SSM Parameter Store, pulled into the containers at start. Nothing secret in git.
-- Migrations run automatically when the API container starts. The seed runs once, with production passwords taken from Parameter Store.
-- Nightly `pg_dump` to an S3 bucket via cron, kept 14 days.
+- `/assets/*`: `Cache-Control: public, max-age=31536000, immutable`.
+- Paths without a file extension that aren't `/api` (like `/d/123`): `index.html` with `Cache-Control: no-cache`.
+- A missing file (like `/assets/old.js`) is a real 404, and unknown `/api` paths keep their JSON 404.
+- It is registered before the session middleware, so static files never touch the session store.
+- Only on when `CLIENT_DIST_DIR` is set. Local dev and tests are unchanged.
 
-**Deploy**
+**Render** (`render.yaml`)
 
-- `scripts/deploy-frontend.sh`: build → `aws s3 sync` → CloudFront invalidation of `/index.html`.
-- `scripts/deploy-backend.sh`: `git archive HEAD` → S3 → SSM command on the instance → download, `docker compose up -d --build`, wait for the API. The instance never needs GitHub access.
-- GitHub Actions can run both on merge to `main` later. Manual scripts first.
+- Web service `ajaia-doc-editor`: Docker runtime, Starter plan, Ohio, auto-deploy from `main`, health check on `/`, custom domain `ajaia.nickesqueda.com`.
+- Database `ajaia-db`: Postgres 16, Basic 256 MB plan, Ohio, empty IP allow list (no outside connections). `DATABASE_URL` is the internal connection string.
+- `SESSION_SECRET` and `SEED_PASSWORD` use `generateValue`. The demo password is read in the service's Environment tab.
+- Behind Render's load balancer, Express trusts one proxy hop (unchanged), so cookies are `Secure` and the login rate limit uses the client IP.
 
-**Cost:** about $19/month (EC2 ≈ $12, public IPv4 ≈ $3.60, EBS ≈ $1.60, S3 + CloudFront ≈ $1 at this traffic).
+**Deploys:** push to `main`. Render builds the image, waits for the health check, then switches traffic. A failed build or health check leaves the previous version running.
 
 ## README outline
 
@@ -80,35 +79,30 @@ Autoscaling, RDS, multi-region, blue/green deploys. Easy to add later; not worth
 3. Run locally: `cp .env.example .env && docker compose up`, demo logins
 4. Architecture (diagram above) and key decisions (Tiptap JSON storage, access model, 404-for-no-access, version conflicts)
 5. Running tests
-6. Deploying to AWS (step-by-step, links to the scripts)
+6. Deploying to Render (link to `docs/deploy/render-setup.md`)
 7. Known limitations: no real-time co-editing, single access level, seeded users only, `.docx` not yet supported
 
 ## Wireframes
 
-Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
-
-**AWS architecture (no new screens in this phase)**
-
-![AWS architecture (no new screens in this phase)](../wireframes/phase-5-architecture.png)
-
-## Decisions
-
-- **Domain:** app at `ajaia.nickesqueda.com` (CNAME to CloudFront). Server at `api.ajaia.nickesqueda.com` (A record to the Elastic IP), used only by CloudFront. DNS is outside AWS, so Nick adds three records.
-- **Region:** `us-east-2`. The CloudFront certificate is in `us-east-1`, because CloudFront requires that.
-- **Infrastructure as code:** no Terraform. Copy-paste CLI steps in [docs/deploy/aws-setup.md](../deploy/aws-setup.md), which Nick runs.
-- **Demo password in production:** generated during setup and stored only in Parameter Store.
+No new screens in this phase.
 
 ## Acceptance criteria
 
-Run against the production URL:
+Before deploy (run locally against the production image):
 
-- [ ] `curl -sI https://<domain>/` → 200, `text/html`; `curl -sI https://<domain>/d/anything` → 200 `index.html` (deep link works)
-- [ ] `curl -s https://<domain>/api/does-not-exist` → JSON 404, not HTML
-- [ ] `curl -i -X POST https://<domain>/api/auth/login …` → `Set-Cookie` with `Secure; HttpOnly; SameSite=Lax`
-- [ ] The Phase 1-4 Playwright suite passes with `BASE_URL=https://<domain>`
-- [ ] `nc -zv <ec2-ip> 5432` and `nc -zv <ec2-ip> 22` → refused/timeout; only 80/443 open
-- [ ] `curl -sI https://api.ajaia.nickesqueda.com/api/auth/me` from outside AWS → timeout (443 only accepts CloudFront)
-- [ ] `aws ssm send-command … "sudo reboot"`, wait, then the Playwright smoke test passes again and earlier docs are still there
-- [ ] `aws s3 ls s3://<backup-bucket>/` shows a dump from the last 24 h; restoring it into a scratch Postgres container succeeds and row counts match
-- [ ] `git grep -nE "SESSION_SECRET=|PASSWORD="` finds only `.env.example` placeholders
-- [ ] Fresh clone in a clean container, following only the README → app running locally and alice can log in
+- [x] `docker build` succeeds. The container starts with `PORT`, `DATABASE_URL`, `SESSION_SECRET` and `SEED_PASSWORD` set, migrates and seeds.
+- [x] `/`, `/login` and `/d/anything` → 200 `text/html`, `Cache-Control: no-cache`. A hashed asset → 200 with a one-year immutable cache. `/assets/missing.js` → 404.
+- [x] `/api/does-not-exist` → JSON 404.
+- [x] Login with `X-Forwarded-Proto: https` → `Set-Cookie` with `HttpOnly; Secure; SameSite=Lax`.
+- [x] Server unit tests cover the routes above (`server/test/serveClientApp.test.ts`). Lint, typecheck and format pass.
+
+After Nick's setup (run against https://ajaia.nickesqueda.com):
+
+- [ ] `curl -sI https://ajaia.nickesqueda.com/` and `/d/anything` → 200 `text/html` with a valid certificate.
+- [ ] `curl -s https://ajaia.nickesqueda.com/api/does-not-exist` → JSON 404, not HTML.
+- [ ] `curl -i -X POST https://ajaia.nickesqueda.com/api/auth/login …` → `Set-Cookie` with `Secure; HttpOnly; SameSite=Lax`.
+- [ ] 11 wrong-password logins in a row → the 11th gets 429. A correct login from another network still works.
+- [ ] The Phase 1-4 Playwright suite passes with `BASE_URL=https://ajaia.nickesqueda.com` and the production `SEED_PASSWORD`.
+- [ ] A push to `main` triggers a deploy, and documents created before it are still there afterwards.
+- [ ] `git grep -nE "SESSION_SECRET=|PASSWORD="` finds only `.env.example` placeholders.
+- [ ] Fresh clone in a clean container, following only the README → app running locally and alice can log in.

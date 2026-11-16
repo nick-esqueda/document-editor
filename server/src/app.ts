@@ -12,16 +12,16 @@ import { createUserRouter } from "./routes/userRoutes";
 import { requireJsonBody } from "./http/requireJsonBody";
 import { errorHandler } from "./http/errorHandler";
 import { sendError } from "./http/sendError";
+import { serveClientApp } from "./http/serveClientApp";
 
 const JSON_BODY_LIMIT = "1mb";
-// CloudFront and Caddy each add one hop. Trusting both lets req.ip be the viewer's IP,
-// which the login rate limiter keys on.
-const TRUSTED_PROXY_HOPS = 2;
+const TRUSTED_PROXY_HOPS = 1;
 
 export interface AppOptions {
   pool: DbPool;
   sessionSecret: string;
   isProduction: boolean;
+  clientDistDir?: string;
   shouldPruneExpiredSessions?: boolean;
   loginRateLimit?: LoginRateLimit;
 }
@@ -30,9 +30,13 @@ export interface AppOptions {
 export function createApp(options: AppOptions): Express {
   const app = express();
 
-  // In production the app sits behind CloudFront and Caddy, which terminate HTTPS.
+  // In production the app sits behind Render's load balancer, which terminates HTTPS.
   if (options.isProduction) {
     app.set("trust proxy", TRUSTED_PROXY_HOPS);
+  }
+
+  if (options.clientDistDir) {
+    serveClientApp(app, options.clientDistDir);
   }
 
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
