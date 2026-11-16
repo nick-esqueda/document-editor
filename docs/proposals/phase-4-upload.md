@@ -57,41 +57,23 @@ browser ──multipart──▶ POST /api/documents/import
 
 ## Wireframes
 
-**Document list with upload**
-```text
-┌────────────────────────────────────────────────────┐
-│ 📄 DocEditor                      Alice ▾ [Log out] │
-├────────────────────────────────────────────────────┤
-│  My documents      [ ⬆ Upload ]  [ + New document ] │
-│                    Supports .txt and .md, up to 1 MB│
-│  ─────────────────────────────────────────────────  │
-│  📄 meeting-notes                Edited just now  ⋮ │
-│  📄 Q3 planning notes            Edited 2 min ago ⋮ │
-│  …                                                 │
-└────────────────────────────────────────────────────┘
-```
-Clicking **Upload** opens the file picker filtered to `.txt,.md`. Dropping a file anywhere on the list also works.
+Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
 
-**Upload states** (toast, bottom of the screen)
-```text
- ┌────────────────────────────────────┐
- │ ⏳ Importing meeting-notes.md…      │
- └────────────────────────────────────┘
- ┌────────────────────────────────────────────────┐
- │ ✕ "report.docx" isn't supported.               │
- │   Upload a .txt or .md file.                   │
- └────────────────────────────────────────────────┘
- ┌────────────────────────────────────────────────┐
- │ ✕ "huge.md" is larger than 1 MB.               │
- └────────────────────────────────────────────────┘
-```
-On success the new document opens in the editor. If anything was simplified, a dismissible note sits above the toolbar:
-```text
-┌────────────────────────────────────────────────────┐
-│ ℹ Imported from meeting-notes.md. Some formatting   │
-│   wasn't supported and was simplified.        [ ✕ ]│
-└────────────────────────────────────────────────────┘
-```
+**Upload button and supported types, import in progress**
+
+![Upload button and supported types, import in progress](../wireframes/phase-4-document-list-upload.png)
+
+**Drag and drop**
+
+![Drag and drop](../wireframes/phase-4-drag-and-drop.png)
+
+**Unsupported file**
+
+![Unsupported file](../wireframes/phase-4-upload-error.png)
+
+**Imported document with the simplification note**
+
+![Imported document with the simplification note](../wireframes/phase-4-imported-document.png)
 
 ## Testing
 

@@ -78,38 +78,19 @@ Routes: `/login`, `/` (protected). A `<RequireAuth>` wrapper calls `/api/auth/me
 
 ## Wireframes
 
-**Login**
-```text
-┌──────────────────────────────────────────────┐
-│                                              │
-│              📄  DocEditor                   │
-│                                              │
-│         ┌──────────────────────────┐         │
-│         │ Username                 │         │
-│         │ [ alice                ] │         │
-│         │ Password                 │         │
-│         │ [ ••••••••             ] │         │
-│         │                          │         │
-│         │ ⚠ Invalid username or    │ ← shown │
-│         │   password               │   on    │
-│         │                          │   error │
-│         │      [   Log in   ]      │         │
-│         └──────────────────────────┘         │
-│      Demo users: alice, bob, carol           │ ← dev only
-└──────────────────────────────────────────────┘
-```
+Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
 
-**App shell after login** (the document list fills this in Phase 2)
-```text
-┌──────────────────────────────────────────────┐
-│ 📄 DocEditor                 Alice ▾ [Log out]│
-├──────────────────────────────────────────────┤
-│                                              │
-│          You're logged in. Documents         │
-│          arrive in Phase 2.                  │
-│                                              │
-└──────────────────────────────────────────────┘
-```
+**Login**
+
+![Login](../wireframes/phase-1-login.png)
+
+**Login, wrong password**
+
+![Login, wrong password](../wireframes/phase-1-login-error.png)
+
+**After login (the document list replaces this in Phase 2)**
+
+![After login (the document list replaces this in Phase 2)](../wireframes/phase-1-app-shell.png)
 
 ## Testing
 

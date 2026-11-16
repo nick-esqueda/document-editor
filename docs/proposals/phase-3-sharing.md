@@ -70,51 +70,23 @@ Listing all users is fine here because users are a small seeded set. With real s
 
 ## Wireframes
 
-**Document list**
-```text
-┌────────────────────────────────────────────────────┐
-│ 📄 DocEditor                      Alice ▾ [Log out] │
-├────────────────────────────────────────────────────┤
-│  My documents                   [ + New document ] │
-│  ─────────────────────────────────────────────────  │
-│  📄 Q3 planning notes   👥 2      Edited 2 min ago ⋮ │
-│  📄 Reading list                  Edited Nov 10    ⋮ │
-│                                                    │
-│  Shared with me                                    │
-│  ─────────────────────────────────────────────────  │
-│  📄 Team retro         from Bob   Edited 1 hr ago   │
-│  📄 Launch checklist   from Carol Edited Nov 12     │
-│                                                    │
-│  (empty: "Nothing shared with you yet.")           │
-└────────────────────────────────────────────────────┘
-```
-`👥 2` = shared with 2 people.
+Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
 
-**Share dialog** (opened from a **Share** button in the editor header, or ⋮ → Share in the list; owner only)
-```text
-        ┌──────────────────────────────────────┐
-        │ Share "Q3 planning notes"         ✕  │
-        ├──────────────────────────────────────┤
-        │ Add people                           │
-        │ [ Select a user…             ▾ ] [Add]│
-        │    Bob                               │
-        │    Carol                             │
-        │                                      │
-        │ People with access                   │
-        │  Alice (you)              Owner      │
-        │  Bob                      [Remove]   │
-        │                                      │
-        │ People with access can view and edit.│
-        └──────────────────────────────────────┘
-```
+**Owned vs shared documents**
 
-**Editor header, opened by someone it was shared with**
-```text
-┌────────────────────────────────────────────────────┐
-│ ← Documents   [ Team retro ]  Owned by Bob ✓ Saved │
-└────────────────────────────────────────────────────┘
-```
-No Share or Delete for non-owners. Instead they see "Owned by …", and clicking it shows the read-only list of people with access.
+![Owned vs shared documents](../wireframes/phase-3-document-list.png)
+
+**Share dialog (owner only)**
+
+![Share dialog (owner only)](../wireframes/phase-3-share-dialog.png)
+
+**Editor opened by someone it was shared with (no Share or Delete)**
+
+![Editor opened by someone it was shared with (no Share or Delete)](../wireframes/phase-3-editor-shared-user.png)
+
+**Access removed while the doc is open**
+
+![Access removed while the doc is open](../wireframes/phase-3-editor-access-removed.png)
 
 ## Testing
 

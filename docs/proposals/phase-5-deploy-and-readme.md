@@ -80,7 +80,11 @@ Autoscaling, RDS, multi-region, blue/green deploys. Easy to add later; not worth
 
 ## Wireframes
 
-No new screens in this phase. The architecture diagram above is the visual for review.
+Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
+
+**AWS architecture (no new screens in this phase)**
+
+![AWS architecture (no new screens in this phase)](../wireframes/phase-5-architecture.png)
 
 ## Open questions
 

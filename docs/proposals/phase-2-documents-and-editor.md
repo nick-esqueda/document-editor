@@ -70,50 +70,27 @@ Tiptap with only what we need: paragraph, heading (H1-H3), bold, italic, underli
 
 ## Wireframes
 
-**Document list**
-```text
-┌────────────────────────────────────────────────────┐
-│ 📄 DocEditor                      Alice ▾ [Log out] │
-├────────────────────────────────────────────────────┤
-│  My documents                   [ + New document ] │
-│  ─────────────────────────────────────────────────  │
-│  📄 Q3 planning notes            Edited 2 min ago ⋮ │
-│  📄 Untitled document            Edited yesterday ⋮ │
-│  📄 Reading list                 Edited Nov 10    ⋮ │
-│                                    ⋮ → Rename       │
-│                                        Delete       │
-│                                                    │
-│  (empty state: "No documents yet. Create one.")    │
-└────────────────────────────────────────────────────┘
-```
+Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
 
-**Editor**
-```text
-┌────────────────────────────────────────────────────┐
-│ ← Documents   [ Q3 planning notes        ]  ✓ Saved │
-│               ↑ click title to rename               │
-├────────────────────────────────────────────────────┤
-│ [Normal ▾] │ B  I  U │ • List  1. List │ ↶ ↷        │
-│  Normal / H1 / H2 / H3                              │
-├────────────────────────────────────────────────────┤
-│                                                    │
-│   Q3 Planning                     ← H1             │
-│                                                    │
-│   Goals for the quarter:                           │
-│    • Ship sharing                                  │
-│    • **Deploy** to AWS                             │
-│                                                    │
-│   |                               ← cursor         │
-│                                                    │
-└────────────────────────────────────────────────────┘
-```
+**Document list, with a row's menu open**
 
-**Conflict banner** (top of the editor)
-```text
-┌────────────────────────────────────────────────────┐
-│ ⚠ This document was changed elsewhere.  [ Reload ] │
-└────────────────────────────────────────────────────┘
-```
+![Document list, with a row's menu open](../wireframes/phase-2-document-list.png)
+
+**Empty list**
+
+![Empty list](../wireframes/phase-2-document-list-empty.png)
+
+**Editor (title focused for renaming)**
+
+![Editor (title focused for renaming)](../wireframes/phase-2-editor.png)
+
+**Save status while the server is unreachable**
+
+![Save status while the server is unreachable](../wireframes/phase-2-editor-offline.png)
+
+**Edit conflict banner**
+
+![Edit conflict banner](../wireframes/phase-2-editor-conflict.png)
 
 ## Testing
 
