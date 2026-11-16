@@ -7,6 +7,7 @@
 **What you get:** a "My documents" list with a New document button. Each doc opens in a Tiptap editor with a toolbar for bold, italic, underline, H1-H3 and bulleted/numbered lists. Click the title to rename it. Changes autosave and the header shows Saving… / Saved / Offline, retrying. Close the tab, come back, and everything is still there.
 
 **How it's built:**
+
 - A `documents` table stores the title and the content as Tiptap JSON (`jsonb`), never HTML.
 - The server checks every save against the same editor schema the browser uses and rejects anything unknown, so stored content can't carry scripts.
 - Autosave fires 1 second after you stop typing (at least every 5 seconds while typing).
@@ -21,7 +22,7 @@
 
 ## Scope
 
-document list (owned docs), create, rename, open, Tiptap editor with toolbar, debounced autosave, save status, version conflict check, owner-only delete *(default, see open questions)*.
+document list (owned docs), create, rename, open, Tiptap editor with toolbar, debounced autosave, save status, version conflict check, owner-only delete _(default, see open questions)_.
 
 ## Out of scope
 
@@ -44,13 +45,13 @@ index on documents(owner_id, updated_at desc)
 
 ## API
 
-| Method | Route | Who | Notes |
-|---|---|---|---|
-| GET | `/api/documents` | logged in | owned docs, newest first (no content) |
-| POST | `/api/documents` | logged in | creates empty doc, returns it |
-| GET | `/api/documents/:id` | has access | title, content, version |
-| PATCH | `/api/documents/:id` | has access | `{title?, content?, version}` → 409 if version is stale |
-| DELETE | `/api/documents/:id` | owner | |
+| Method | Route                | Who        | Notes                                                   |
+| ------ | -------------------- | ---------- | ------------------------------------------------------- |
+| GET    | `/api/documents`     | logged in  | owned docs, newest first (no content)                   |
+| POST   | `/api/documents`     | logged in  | creates empty doc, returns it                           |
+| GET    | `/api/documents/:id` | has access | title, content, version                                 |
+| PATCH  | `/api/documents/:id` | has access | `{title?, content?, version}` → 409 if version is stale |
+| DELETE | `/api/documents/:id` | owner      |                                                         |
 
 **Access check:** one helper, `getAccessibleDoc(userId, docId)`, used by every `:id` route. In this phase it means "owner". Phase 3 widens it to "owner or granted". No access returns **404**, not 403, so IDs don't reveal that a doc exists.
 
@@ -66,7 +67,7 @@ Tiptap with only what we need: paragraph, heading (H1-H3), bold, italic, underli
 - Title saves on blur / Enter.
 - Status in the header: **Saving…** → **Saved** → **Offline, retrying** (exponential backoff).
 - On tab close with unsaved changes: one last `fetch(..., {keepalive: true})` plus the browser "leave page?" prompt.
-- **Conflict:** each save sends the `version` it was based on. If someone else saved in between (possible after Phase 3), the server returns 409 and the editor shows a banner: *"This document was changed elsewhere. Reload to see the latest version."* Your unsaved text is kept in the editor so you can copy it. Simple, and nothing gets silently overwritten.
+- **Conflict:** each save sends the `version` it was based on. If someone else saved in between (possible after Phase 3), the server returns 409 and the editor shows a banner: _"This document was changed elsewhere. Reload to see the latest version."_ Your unsaved text is kept in the editor so you can copy it. Simple, and nothing gets silently overwritten.
 
 ## Wireframes
 

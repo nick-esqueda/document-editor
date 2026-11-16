@@ -9,7 +9,10 @@ const { chromium } = require("playwright");
 const { SCREENS } = require("./screens.cjs");
 
 const OUTPUT_DIR = path.join(__dirname, "..");
-const STYLESHEET = fs.readFileSync(path.join(__dirname, "wireframe.css"), "utf8");
+const STYLESHEET = fs.readFileSync(
+  path.join(__dirname, "wireframe.css"),
+  "utf8",
+);
 const VIEWPORT = { width: 1200, height: 760 };
 const DEVICE_SCALE_FACTOR = 2;
 
@@ -29,10 +32,14 @@ async function renderScreen(page, name) {
 
 async function renderWireframes() {
   const requestedNames = process.argv.slice(2);
-  const names = requestedNames.length > 0 ? requestedNames : Object.keys(SCREENS);
+  const names =
+    requestedNames.length > 0 ? requestedNames : Object.keys(SCREENS);
 
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: DEVICE_SCALE_FACTOR });
+  const page = await browser.newPage({
+    viewport: VIEWPORT,
+    deviceScaleFactor: DEVICE_SCALE_FACTOR,
+  });
 
   for (const name of names) {
     await renderScreen(page, name);

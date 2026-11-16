@@ -7,6 +7,7 @@
 **What you get:** clone the repo, run `docker compose up`, open the browser and log in as alice, bob or carol. After login you see an empty app shell with your name and a Log out button.
 
 **How it's built:**
+
 - One repo with three packages: `client/` (React + Vite), `server/` (Express) and `shared/` (types and the editor schema, used by both sides from Phase 2 on).
 - Postgres runs in Docker. Tables are created by migration files, and a seed script adds the three demo users with bcrypt-hashed passwords.
 - Login sets an `httpOnly` session cookie stored in Postgres. The server only ever trusts the user id in the session, never one sent by the browser.
@@ -60,13 +61,14 @@ session (...)   -- managed by connect-pg-simple
 
 ## API
 
-| Method | Route | Notes |
-|---|---|---|
-| POST | `/api/auth/login` | `{username, password}` → sets cookie, returns `{id, username, displayName}` |
-| POST | `/api/auth/logout` | destroys session |
-| GET  | `/api/auth/me` | current user, or 401 |
+| Method | Route              | Notes                                                                       |
+| ------ | ------------------ | --------------------------------------------------------------------------- |
+| POST   | `/api/auth/login`  | `{username, password}` → sets cookie, returns `{id, username, displayName}` |
+| POST   | `/api/auth/logout` | destroys session                                                            |
+| GET    | `/api/auth/me`     | current user, or 401                                                        |
 
 **Security rules (apply to every later phase):**
+
 - Identity comes **only** from `req.session.userId`. Request bodies never carry a user id the server trusts.
 - Cookie: `httpOnly`, `sameSite=lax`, `secure` in production. Session id regenerated on login.
 - Same generic error for unknown user and wrong password. Login is rate-limited (10 attempts/min per IP).

@@ -4,6 +4,8 @@
  * Shared pieces (header, document rows, editor chrome) are small helpers so screens stay consistent.
  */
 
+const APP_NAME = "Ajaia Doc Editor";
+
 const DEMO_ROWS = [
   { title: "Q3 planning notes", edited: "Edited 2 min ago" },
   { title: "Untitled document", edited: "Edited yesterday" },
@@ -21,7 +23,7 @@ function renderLabel(text) {
 
 function renderAppHeader() {
   return `<div class="header">
-    <div class="brand"><div class="logo"></div>DocEditor</div>
+    <div class="brand"><div class="logo"></div>${APP_NAME}</div>
     <div class="spacer"></div>
     <div class="user"><div class="avatar">A</div>Alice</div>
     <button class="btn">Log out</button>
@@ -29,9 +31,14 @@ function renderAppHeader() {
 }
 
 function renderDocRow(row) {
-  const sharedPill = row.sharedCount ? `<span class="pill">👥 Shared with ${row.sharedCount}</span>` : "";
-  const ownerText = row.owner ? `<span class="meta">from ${row.owner}</span>` : "";
-  const menuButton = row.hasMenu === false ? "" : `<span class="kebab">⋮</span>`;
+  const sharedPill = row.sharedCount
+    ? `<span class="pill">👥 Shared with ${row.sharedCount}</span>`
+    : "";
+  const ownerText = row.owner
+    ? `<span class="meta">from ${row.owner}</span>`
+    : "";
+  const menuButton =
+    row.hasMenu === false ? "" : `<span class="kebab">⋮</span>`;
   const openMenu = row.menu ? renderRowMenu(row.menu) : "";
 
   return `<div class="row">
@@ -41,7 +48,10 @@ function renderDocRow(row) {
 }
 
 function renderRowMenu(items) {
-  const itemHtml = items.map((item) => `<div class="${item.isDanger ? "danger" : ""}">${item.text}</div>`);
+  const itemHtml = items.map(
+    (item) =>
+      `<div class="${item.isDanger ? "danger" : ""}">${item.text}</div>`,
+  );
   return `<div class="menu">${itemHtml.join("")}</div>`;
 }
 
@@ -51,7 +61,12 @@ function renderDocSection(heading, rows, actionsHtml = "", hintHtml = "") {
     <div class="rows">${rowHtml}</div>`;
 }
 
-function renderEditorBar({ title, status, extraHtml = "", isTitleFocused = false }) {
+function renderEditorBar({
+  title,
+  status,
+  extraHtml = "",
+  isTitleFocused = false,
+}) {
   const focusClass = isTitleFocused ? "focus" : "";
   return `<div class="editor-bar">
     <button class="btn ghost">← Documents</button>
@@ -82,10 +97,12 @@ function renderSampleDocument() {
 }
 
 function renderLoginScreen({ hasError }) {
-  const errorHtml = hasError ? `<div class="error-text">⚠ Invalid username or password</div>` : "";
+  const errorHtml = hasError
+    ? `<div class="error-text">⚠ Invalid username or password</div>`
+    : "";
   return `<div class="screen">${renderLabel(hasError ? "Phase 1 · Login (error)" : "Phase 1 · Login")}
     <div class="center"><div>
-      <div class="brand" style="justify-content:center;margin-bottom:22px;font-size:24px"><div class="logo"></div>DocEditor</div>
+      <div class="brand" style="justify-content:center;margin-bottom:22px;font-size:24px"><div class="logo"></div>${APP_NAME}</div>
       <div class="login-card">
         <div class="field-label">Username</div><div class="input">alice</div>
         <div class="field-label" style="margin-top:14px">Password</div><div class="input">••••••••••</div>
@@ -106,7 +123,12 @@ function renderAppShell() {
 
 function renderPhase2List() {
   const rows = DEMO_ROWS.map((row, index) =>
-    index === 1 ? { ...row, menu: [{ text: "Rename" }, { text: "Delete", isDanger: true }] } : row,
+    index === 1
+      ? {
+          ...row,
+          menu: [{ text: "Rename" }, { text: "Delete", isDanger: true }],
+        }
+      : row,
   );
   const actions = `<button class="btn primary">+ New document</button>`;
   return `<div class="screen">${renderLabel("Phase 2 · Document list (row menu open)")}${renderAppHeader()}
@@ -190,7 +212,10 @@ function renderUploadActions() {
 const UPLOAD_HINT = `<span class="hint">Upload supports .txt and .md, up to 1 MB</span>`;
 
 function renderPhase4List() {
-  const rows = [{ title: "meeting-notes", edited: "Edited just now" }, ...DEMO_ROWS];
+  const rows = [
+    { title: "meeting-notes", edited: "Edited just now" },
+    ...DEMO_ROWS,
+  ];
   return `<div class="screen">${renderLabel("Phase 4 · Upload button")}${renderAppHeader()}
     <div class="page">${renderDocSection("My documents", rows, renderUploadActions(), UPLOAD_HINT)}</div>
     <div class="toast">⏳ <span>Importing <b>meeting-notes.md</b>…</span></div></div>`;

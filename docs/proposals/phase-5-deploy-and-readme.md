@@ -7,6 +7,7 @@
 **What you get:** the app live on AWS at an HTTPS URL, plus a README that explains what it is, how to run it locally in a few minutes, how it's built, and how to redeploy.
 
 **How it's built:**
+
 - CloudFront is the single front door. It serves the React app from a private S3 bucket and forwards `/api/*` to the server, so the login cookie just works with no cross-site setup.
 - One EC2 instance (t4g.small) runs the API, Postgres and Caddy (for HTTPS) in Docker, the same way it runs locally.
 - Only ports 80 and 443 are open. Admin access uses AWS Session Manager instead of SSH, and secrets live in AWS Parameter Store, not in git.
@@ -49,11 +50,13 @@ Autoscaling, RDS, multi-region, blue/green deploys. Easy to add later; not worth
 ## Details
 
 **CloudFront**
+
 - `/api/*` behavior: caching disabled, all HTTP methods, forwards cookies, query strings and the `Content-Type` header.
 - SPA routing: a small CloudFront Function rewrites non-`/api`, non-file paths (like `/d/123`) to `/index.html`. We avoid "custom error page → index.html" because it would also turn real API 404s into HTML.
 - Hashed asset files cached for a year; `index.html` not cached.
 
 **EC2**
+
 - t4g.small (2 vCPU, 2 GB, ARM), Amazon Linux 2023, 20 GB gp3 disk. Docker + Compose.
 - `docker-compose.prod.yml`: `caddy`, `api`, `postgres`. Postgres has no public port.
 - Security group: 443 and 80 (for certificate renewal) only. No SSH port: shell access through SSM Session Manager.
@@ -62,6 +65,7 @@ Autoscaling, RDS, multi-region, blue/green deploys. Easy to add later; not worth
 - Nightly `pg_dump` to an S3 bucket via cron, kept 14 days.
 
 **Deploy**
+
 - `scripts/deploy-frontend.sh`: build → `aws s3 sync` → CloudFront invalidation of `/index.html`.
 - `scripts/deploy-backend.sh`: SSM command on the instance → `git pull` → `docker compose up -d --build`.
 - GitHub Actions can run both on merge to `main` later. Manual scripts first.
@@ -88,8 +92,8 @@ Rendered mockups. The layout and wording are what I'll build; colors and spacing
 
 ## Open questions
 
-- **Domain:** do you have a domain (or want one in Route 53, about $12/yr)? Caddy needs a hostname for the EC2 TLS certificate. *Without one:* CloudFront's `*.cloudfront.net` URL for users, and EC2 serves HTTP only, with the security group locked to CloudFront's IP ranges. That works, but the CloudFront → EC2 hop isn't encrypted.
-- **Infrastructure as code:** *Default: no.* Documented console steps + scripts. Terraform is about half a day extra if you want reproducible infra.
+- **Domain:** do you have a domain (or want one in Route 53, about $12/yr)? Caddy needs a hostname for the EC2 TLS certificate. _Without one:_ CloudFront's `*.cloudfront.net` URL for users, and EC2 serves HTTP only, with the security group locked to CloudFront's IP ranges. That works, but the CloudFront → EC2 hop isn't encrypted.
+- **Infrastructure as code:** _Default: no._ Documented console steps + scripts. Terraform is about half a day extra if you want reproducible infra.
 - **AWS account/region:** I'll write the steps for `us-east-1` unless you prefer another region. You run the AWS steps, or give me credentials through the environment's secrets.
 
 ## Acceptance criteria
