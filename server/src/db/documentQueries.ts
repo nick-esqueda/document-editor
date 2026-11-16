@@ -1,7 +1,8 @@
-import type {
-  DocumentJson,
-  OwnedDocumentSummary,
-  SharedDocumentSummary,
+import {
+  DEFAULT_DOCUMENT_TITLE,
+  type DocumentJson,
+  type OwnedDocumentSummary,
+  type SharedDocumentSummary,
 } from "@doc-editor/shared";
 import type { DbPool } from "./pool";
 
@@ -61,17 +62,24 @@ export async function listDocumentsSharedWith(
   return result.rows;
 }
 
+export interface NewDocument {
+  ownerId: string;
+  content: DocumentJson;
+  /** Defaults to "Untitled document". */
+  title?: string;
+}
+
 export async function insertDocument(
   pool: DbPool,
-  ownerId: string,
-  content: DocumentJson,
+  newDocument: NewDocument,
 ): Promise<DocumentRecord> {
+  const { ownerId, content, title } = newDocument;
   const result = await pool.query<DocumentRecord>(
     `WITH inserted AS (
-       INSERT INTO documents (owner_id, content) VALUES ($1, $2) RETURNING *
+       INSERT INTO documents (owner_id, content, title) VALUES ($1, $2, $3) RETURNING *
      )
      ${buildSelectWithOwner("inserted")}`,
-    [ownerId, content],
+    [ownerId, content, title ?? DEFAULT_DOCUMENT_TITLE],
   );
 
   return result.rows[0];

@@ -1,4 +1,4 @@
-import type { ApiErrorBody } from "@doc-editor/shared";
+import { UPLOAD_REQUEST_HEADER, type ApiErrorBody } from "@doc-editor/shared";
 
 const FALLBACK_ERROR_MESSAGE = "Something went wrong. Please try again.";
 
@@ -25,6 +25,33 @@ export async function requestJson<ResponseBody>(
     body: hasBody ? JSON.stringify(init.body) : undefined,
   });
 
+  return readResponse<ResponseBody>(response);
+}
+
+/** Sends one file as multipart form data and returns the parsed JSON response. */
+export async function uploadFile<ResponseBody>(
+  path: string,
+  fieldName: string,
+  file: File,
+): Promise<ResponseBody> {
+  const formData = new FormData();
+  formData.append(fieldName, file);
+
+  // No Content-Type: the browser sets it, with the multipart boundary.
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { [UPLOAD_REQUEST_HEADER]: "1" },
+    body: formData,
+  });
+
+  return readResponse<ResponseBody>(response);
+}
+
+/** Returns the parsed JSON body (or undefined for 204), or throws ApiError for non-2xx. */
+async function readResponse<ResponseBody>(
+  response: Response,
+): Promise<ResponseBody> {
   if (!response.ok) {
     throw await buildApiError(response);
   }
