@@ -172,6 +172,19 @@ describe("upload API", () => {
     expect(stored.body.title).toBe("Café notes 🎉");
   });
 
+  it("keeps an imported emoji title savable as it is", async () => {
+    const response = await upload(`${"🎉".repeat(150)}.md`, "hi");
+    const stored = await getDocument(response.body.id);
+
+    const save = await request(app)
+      .patch(`${DOCUMENTS_PATH}/${response.body.id}`)
+      .set("Cookie", aliceCookie)
+      .send({ version: stored.body.version, title: stored.body.title });
+
+    expect(stored.body.title).toBe("🎉".repeat(100));
+    expect(save.status).toBe(200);
+  });
+
   it("cuts a 250-character file name to a 200-character title", async () => {
     const response = await upload(`${"b".repeat(250)}.txt`, "hi");
     const stored = await getDocument(response.body.id);
@@ -234,6 +247,13 @@ describe("upload API", () => {
       await expectRejectedUpload(
         () =>
           upload("one.txt", "1").attach("file", Buffer.from("2"), "two.txt"),
+        400,
+      );
+    });
+
+    it("rejects text fields sent alongside the file with 400", async () => {
+      await expectRejectedUpload(
+        () => upload("notes.txt", "hi").field("extra", "x".repeat(100_000)),
         400,
       );
     });

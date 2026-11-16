@@ -79,13 +79,31 @@ function rejectIfTooLarge(content: DocumentJson): void {
   }
 }
 
-/** "meeting-notes.md" → "meeting-notes", cut to the title limit (counting characters, not bytes). */
+/**
+ * "meeting-notes.md" → "meeting-notes", cut to the title limit.
+ * The limit counts UTF-16 code units, like the save validation and the title
+ * input do, so an imported title can always be edited and saved. An emoji is
+ * never cut in half.
+ */
 export function buildTitleFromFileName(fileName: string): string {
   const nameWithoutExtension = splitFileName(fileName).baseName.trim();
-  const characters = Array.from(nameWithoutExtension);
-  const title = characters.slice(0, MAX_TITLE_LENGTH).join("").trim();
+  const title = cutToLength(nameWithoutExtension, MAX_TITLE_LENGTH).trim();
 
   return title || DEFAULT_DOCUMENT_TITLE;
+}
+
+/** Keeps whole characters (code points) while the result fits in maxLength code units. */
+function cutToLength(text: string, maxLength: number): string {
+  let result = "";
+
+  for (const character of text) {
+    if (result.length + character.length > maxLength) {
+      break;
+    }
+    result += character;
+  }
+
+  return result;
 }
 
 /**

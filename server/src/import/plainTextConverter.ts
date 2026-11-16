@@ -5,8 +5,7 @@ import { buildTextWithLineBreaks } from "./buildTextWithLineBreaks";
 /** One or more blank lines (lines may hold spaces or tabs) end a paragraph. */
 const PARAGRAPH_BREAK = /\n(?:[ \t]*\n)+/;
 
-/** Blank lines at the very start or end, including the file's final newline. */
-const OUTER_BLANK_LINES = /^(?:[ \t]*\n)+|(?:\n[ \t]*)+$/g;
+const BLANK_LINE = /^[ \t]*$/;
 
 /**
  * Plain text: blocks separated by blank lines become paragraphs, and single
@@ -15,7 +14,7 @@ const OUTER_BLANK_LINES = /^(?:[ \t]*\n)+|(?:\n[ \t]*)+$/g;
  */
 export const plainTextConverter: DocumentConverter = {
   convert(text: string): ConversionResult {
-    const trimmedText = text.replace(OUTER_BLANK_LINES, "");
+    const trimmedText = removeOuterBlankLines(text);
     const textBlocks = trimmedText.split(PARAGRAPH_BREAK);
     const nonBlankBlocks = textBlocks.filter((block) => block.trim() !== "");
     const blocks = nonBlankBlocks.map(buildParagraph);
@@ -23,6 +22,27 @@ export const plainTextConverter: DocumentConverter = {
     return { blocks, warnings: 0 };
   },
 };
+
+/**
+ * Drops blank lines at the very start and end, including the file's final newline.
+ * Done line by line rather than with a regex: an end-anchored regex like
+ * /(\n[ \t]*)+$/ rescans long runs of newlines and takes quadratic time.
+ */
+function removeOuterBlankLines(text: string): string {
+  const lines = text.split("\n");
+  const firstTextLine = lines.findIndex((line) => !BLANK_LINE.test(line));
+
+  if (firstTextLine === -1) {
+    return "";
+  }
+
+  let lastTextLine = lines.length - 1;
+  while (BLANK_LINE.test(lines[lastTextLine])) {
+    lastTextLine -= 1;
+  }
+
+  return lines.slice(firstTextLine, lastTextLine + 1).join("\n");
+}
 
 function buildParagraph(textBlock: string): JSONContent {
   const lines = textBlock.split("\n");

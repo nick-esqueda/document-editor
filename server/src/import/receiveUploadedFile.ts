@@ -18,12 +18,18 @@ const MULTER_ERROR_RESPONSES: Record<
   LIMIT_FILE_SIZE: { status: 413, message: TOO_LARGE_MESSAGE },
   LIMIT_FILE_COUNT: { status: 400, message: NOT_ONE_FILE_MESSAGE },
   LIMIT_UNEXPECTED_FILE: { status: 400, message: NOT_ONE_FILE_MESSAGE },
+  LIMIT_FIELD_COUNT: { status: 400, message: NOT_ONE_FILE_MESSAGE },
+  LIMIT_PART_COUNT: { status: 400, message: NOT_ONE_FILE_MESSAGE },
 };
 
-/** Files stay in memory (never written to disk), at most one, at most MAX_UPLOAD_BYTES. */
+/**
+ * Files stay in memory (never written to disk), at most one, at most MAX_UPLOAD_BYTES.
+ * The form has no text fields, so none are accepted (each could otherwise hold
+ * up to 1 MB in memory), and the whole upload is limited to that one part.
+ */
 const parseSingleFile = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 0, parts: 1 },
   // Browsers send UTF-8 filenames without saying so; multer would assume latin1.
   defParamCharset: "utf8",
 }).single(UPLOAD_FIELD_NAME);

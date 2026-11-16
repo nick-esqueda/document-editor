@@ -402,11 +402,27 @@ describe("title from the file name", () => {
     expect(importText(longName, "x").title).toBe("a".repeat(200));
   });
 
-  it("counts characters, not bytes, when cutting (emoji stay whole)", () => {
-    const emojiName = `${"🎉".repeat(250)}.txt`;
-    const title = importText(emojiName, "x").title;
+  it("cuts by the same length rule saves use, without splitting an emoji", () => {
+    // An emoji is 2 UTF-16 code units, and saves allow 200 code units.
+    const emojiTitle = importText(`${"🎉".repeat(250)}.txt`, "x").title;
+    const oddTitle = importText(`a${"🎉".repeat(150)}.txt`, "x").title;
 
-    expect(Array.from(title)).toHaveLength(200);
-    expect(title).toBe("🎉".repeat(200));
+    expect(emojiTitle).toBe("🎉".repeat(100));
+    expect(oddTitle).toBe(`a${"🎉".repeat(99)}`);
+  });
+});
+
+describe("plain text: performance", () => {
+  const MAX_CONVERSION_MS = 1000;
+
+  it.each([
+    ["a long run of newlines between text", `a${"\n".repeat(900_000)}x`],
+    ["a long run of blank lines with spaces", `a${"\n \t".repeat(300_000)}\nx`],
+    ["only newlines", "\n".repeat(1_000_000)],
+  ])("converts %s quickly (no quadratic regex)", (_name, text) => {
+    const startedAt = performance.now();
+    importText("big.txt", text);
+
+    expect(performance.now() - startedAt).toBeLessThan(MAX_CONVERSION_MS);
   });
 });

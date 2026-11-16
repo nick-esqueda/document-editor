@@ -19,6 +19,16 @@ const IMPORTED_DOCUMENT = buildDocumentWithText("Imported text", {
   id: "doc-imported",
   title: "notes",
 });
+const OTHER_DOCUMENT = buildDocumentWithText("Other document text", {
+  id: "doc-other",
+  title: "Other document",
+});
+const OTHER_DOCUMENT_SUMMARY = {
+  id: OTHER_DOCUMENT.id,
+  title: OTHER_DOCUMENT.title,
+  updatedAt: OTHER_DOCUMENT.updatedAt,
+  sharedWithCount: 0,
+};
 const TWO_MEGABYTES = 2 * 1024 * 1024;
 
 function buildFile(name: string, contents = "hello"): File {
@@ -107,6 +117,50 @@ describe("upload on the document list", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent(
       "Importing meeting-notes.md…",
+    );
+  });
+
+  it("ignores a second file while one is still importing", async () => {
+    mockedDocumentsApi.importDocument.mockReturnValue(new Promise(() => {}));
+    await renderListPage();
+
+    await chooseFile(buildFile("first.md"));
+    await chooseFile(buildFile("second.md"));
+
+    expect(mockedDocumentsApi.importDocument).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status")).toHaveTextContent("first.md");
+  });
+
+  it("stays on the page the user went to when an import finishes after they left", async () => {
+    let finishImport: (response: {
+      id: string;
+      warnings: number;
+    }) => void = () => {};
+    mockedDocumentsApi.importDocument.mockReturnValue(
+      new Promise((resolve) => {
+        finishImport = resolve;
+      }),
+    );
+    mockedDocumentsApi.listDocuments.mockResolvedValue({
+      owned: [{ ...OTHER_DOCUMENT_SUMMARY }],
+      shared: [],
+    });
+    mockedDocumentsApi.fetchDocument.mockImplementation(async (id) =>
+      id === OTHER_DOCUMENT.id ? OTHER_DOCUMENT : IMPORTED_DOCUMENT,
+    );
+    await renderListPage();
+
+    await chooseFile(buildFile("slow.md"));
+    await userEvent.click(
+      await screen.findByRole("link", { name: OTHER_DOCUMENT.title }),
+    );
+    await screen.findByText("Other document text");
+    finishImport({ id: IMPORTED_DOCUMENT.id, warnings: 0 });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByText("Other document text")).toBeInTheDocument();
+    expect(mockedDocumentsApi.fetchDocument).not.toHaveBeenCalledWith(
+      IMPORTED_DOCUMENT.id,
     );
   });
 
