@@ -10,7 +10,7 @@
 
 - The file goes to the server, which checks the type and size and rejects anything that isn't real text.
 - After conversion, the new document must also fit the normal document size limit (the same one every save uses). Converted JSON is larger than the raw text, so a file just under 1 MB can be rejected with a clear "too large once converted" message. This means an uploaded doc can always be edited and saved afterwards.
-- Markdown is converted with markdown-it, with raw HTML turned off, then into Tiptap JSON. Plain text becomes paragraphs.
+- Markdown is parsed with markdown-it, with raw HTML turned off, and its tokens are turned into Tiptap JSON. Plain text becomes paragraphs.
 - The result passes the same schema check as normal saves, so an upload can't sneak in anything the editor wouldn't allow.
 - Markdown features the editor doesn't support are simplified, not lost silently. Tables become text, H4-H6 become H3, and images are dropped. A note tells you when this happened.
 - Wrong type, too large and binary files each get a clear error message.
@@ -36,7 +36,7 @@ browser ──multipart──▶ POST /api/documents/import
                           │ 1. check extension (.txt/.md) and size ≤ 1 MB
                           │ 2. decode as UTF-8; reject binary (NUL bytes / invalid UTF-8)
                           │ 3. convert
-                          │      .md  → markdown-it (html: false) → HTML → Tiptap JSON
+                          │      .md  → markdown-it (html: false) → tokens → Tiptap JSON
                           │      .txt → paragraphs split on blank lines,
                           │             single newlines become line breaks
                           │ 4. validate against the shared editor schema (same as Phase 2)
@@ -46,12 +46,13 @@ browser ──multipart──▶ POST /api/documents/import
                        201 { id }  → browser opens /d/:id
 ```
 
-- **Conversion happens on the server**, using Tiptap's server-side `generateJSON` with the same extension list as the editor. Stored content is always valid editor JSON.
+- **Conversion happens on the server.** markdown-it's tokens are mapped to Tiptap JSON by a lookup table (one rule per token type), then run through the editor's own schema, so the stored JSON is exactly what the editor itself would save. _Changed during implementation:_ the first plan went markdown → HTML → Tiptap's `generateJSON`. Mapping tokens directly keeps code indentation (HTML parsing collapses spaces), counts each simplification precisely for the warning, and needs no server-side DOM library.
 - **`html: false` in markdown-it** means raw HTML inside markdown is treated as text, never executed. The schema step is a second safety net.
 - **Title** = filename without extension (e.g. `meeting-notes.md` → "meeting-notes"), trimmed and cut to the normal 200-character title limit. An empty name becomes "Untitled document".
 - **Size limits match normal documents.** A normal save can be at most 1 MB of JSON (title + content), and a title at most 200 characters. The 1 MB file check runs first to reject big files cheaply. The converted content is then checked against the save limit, using one shared constant with a little room left for the title and version. Without this, an upload could create a document whose every later save fails with 413.
 - **Lossy by design:** markdown features the editor doesn't support are simplified. H4-H6 → H3, code blocks and blockquotes → paragraphs, tables → text, links → link text, images → dropped. The upload response includes a `warnings` count, and the UI shows _"Some formatting wasn't supported and was simplified."_
 - multer with memory storage and a 1 MB limit. Nothing is written to disk.
+- **CSRF:** every other API route only accepts JSON bodies. The upload route also accepts multipart, but only with an `X-Upload-Request` header, which a cross-site form can't send.
 
 ## API
 

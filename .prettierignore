@@ -4,3 +4,6 @@ coverage/
 playwright-report/
 test-results/
 package-lock.json
+
+# Test fixtures: their exact bytes are the input under test.
+server/test/fixtures/

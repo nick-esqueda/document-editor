@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 import type { DocumentDetails } from "@doc-editor/shared";
 import { fetchDocument } from "../api/documentsApi";
 import { ApiError } from "../api/httpClient";
 import { DocumentEditor } from "../editor/DocumentEditor";
 import { HOME_PATH } from "../routes";
+import { readImportNotice } from "../upload/importNotice";
 
 type LoadState =
   | { kind: "loading" }
@@ -23,13 +24,19 @@ export function DocumentEditorPage() {
 
 function DocumentLoader({ documentId }: { documentId: string }) {
   const loadState = useDocument(documentId);
+  const importNotice = readImportNotice(useLocation().state);
 
   if (loadState.kind === "loading") {
     return <p className="loading">Loading…</p>;
   }
 
   if (loadState.kind === "loaded") {
-    return <DocumentEditor document={loadState.document} />;
+    return (
+      <DocumentEditor
+        document={loadState.document}
+        importNotice={importNotice}
+      />
+    );
   }
 
   const message =

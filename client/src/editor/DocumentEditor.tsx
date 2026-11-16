@@ -14,9 +14,20 @@ import { EditorBanner } from "./EditorBanner";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { TitleInput } from "./TitleInput";
 import { useAutosave } from "./useAutosave";
+import { ImportNoticeBanner } from "../upload/ImportNoticeBanner";
+import type { ImportNotice } from "../upload/importNotice";
 
 /** The editing screen for one loaded document: header, toolbar and the page. */
-export function DocumentEditor({ document }: { document: DocumentDetails }) {
+interface DocumentEditorProps {
+  document: DocumentDetails;
+  /** Set right after the document was created from an uploaded file. */
+  importNotice?: ImportNotice | null;
+}
+
+export function DocumentEditor({
+  document,
+  importNotice = null,
+}: DocumentEditorProps) {
   const { controller, status } = useAutosave(document.id, document.version);
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -76,6 +87,7 @@ export function DocumentEditor({ document }: { document: DocumentDetails }) {
         <SaveStatusIndicator status={status} />
       </header>
       <EditorBanner status={status} />
+      <ImportNoticeBanner notice={importNotice} />
       {editor && <EditorToolbar editor={editor} />}
       <main className="editor-canvas">
         <EditorContent editor={editor} />

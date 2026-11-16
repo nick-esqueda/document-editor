@@ -37,6 +37,12 @@ export interface DocumentDetails extends DocumentSummary {
 
 export type CreateDocumentResponse = DocumentDetails;
 
+/** Result of uploading a file. `warnings` counts formatting that was simplified. */
+export interface ImportDocumentResponse {
+  id: string;
+  warnings: number;
+}
+
 /** A save. `version` is the version the edit was based on, for conflict detection. */
 export interface UpdateDocumentRequest {
   version: number;

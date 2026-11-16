@@ -15,6 +15,15 @@ Open http://localhost:5173 and log in as `alice`, `bob` or `carol` with the `SEE
 
 Compose starts Postgres, the API (port 3000, runs migrations and the seed on start) and the Vite dev server (port 5173, forwards `/api` to the API).
 
+## Importing files
+
+The **Upload** button on the document list (or dragging a file onto the list) turns a file into a new document you own.
+
+- **Supported types:** `.txt` and `.md`, up to 1 MB, UTF-8 text. Other types (including `.docx` and `.pdf`) are rejected.
+- **Plain text:** blank lines separate paragraphs; single line breaks are kept.
+- **Markdown:** headings, bold, italic, bullet and numbered lists are kept. Features the editor doesn't have are simplified, and the editor says so: H4-H6 become H3, code blocks and quotes become plain paragraphs, links keep only their text, tables become one line per row, images and horizontal rules are dropped. Raw HTML is kept as literal text.
+- The converted document must also fit the normal document size limit, so it can always be saved afterwards.
+
 ## Develop without Docker for the app
 
 Postgres still runs in Docker; the API and client run on your machine (Node 22).

@@ -19,6 +19,11 @@ import { DocumentRow } from "../documents/DocumentRow";
 import { SharedDocumentRow } from "../documents/SharedDocumentRow";
 import { ShareDialog } from "../sharing/ShareDialog";
 import { buildDocumentPath } from "../routes";
+import { UploadButton } from "../upload/UploadButton";
+import { ImportToast } from "../upload/ImportToast";
+import { DROP_HINT, UPLOAD_SUPPORT_HINT } from "../upload/checkUploadFile";
+import { useFileImport } from "../upload/useFileImport";
+import { useFileDrop } from "../upload/useFileDrop";
 
 const LOAD_FAILED_MESSAGE =
   "Your documents couldn't be loaded. Please refresh the page.";
@@ -36,6 +41,8 @@ export function DocumentListPage() {
     useState<OwnedDocumentSummary | null>(null);
   const [documentToShare, setDocumentToShare] =
     useState<OwnedDocumentSummary | null>(null);
+  const { importState, importFile, dismissImportState } = useFileImport();
+  const { isDraggingFile, dropHandlers } = useFileDrop(importFile);
 
   async function handleCreate() {
     await runAction(async () => {
@@ -91,10 +98,12 @@ export function DocumentListPage() {
   return (
     <>
       <AppHeader />
-      <main className="page">
+      <main className="page drop-area" {...dropHandlers}>
         <div className="section-head">
           <h2>My documents</h2>
+          <span className="hint">{UPLOAD_SUPPORT_HINT}</span>
           <span className="spacer" />
+          <UploadButton onFileChosen={importFile} />
           <button
             type="button"
             className="button primary"
@@ -118,7 +127,13 @@ export function DocumentListPage() {
           <h2>Shared with me</h2>
         </div>
         <SharedDocumentList documents={lists?.shared ?? null} />
+        {isDraggingFile && (
+          <div className="drop-overlay" aria-hidden="true">
+            {DROP_HINT}
+          </div>
+        )}
       </main>
+      <ImportToast importState={importState} onDismiss={dismissImportState} />
       {documentToShare && (
         <ShareDialog
           documentId={documentToShare.id}

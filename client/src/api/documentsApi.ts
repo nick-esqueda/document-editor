@@ -4,9 +4,10 @@ import type {
   DocumentDetails,
   DocumentListResponse,
   GrantAccessRequest,
+  ImportDocumentResponse,
   UpdateDocumentRequest,
 } from "@doc-editor/shared";
-import { requestJson } from "./httpClient";
+import { requestJson, uploadFile } from "./httpClient";
 
 const DOCUMENTS_PATH = "/api/documents";
 
@@ -22,6 +23,17 @@ export function createDocument(): Promise<CreateDocumentResponse> {
   return requestJson<CreateDocumentResponse>(DOCUMENTS_PATH, {
     method: "POST",
   });
+}
+
+const IMPORT_FILE_FIELD = "file";
+
+/** Uploads a .txt or .md file, which the server turns into a new document. */
+export function importDocument(file: File): Promise<ImportDocumentResponse> {
+  return uploadFile<ImportDocumentResponse>(
+    `${DOCUMENTS_PATH}/import`,
+    IMPORT_FILE_FIELD,
+    file,
+  );
 }
 
 export function fetchDocument(documentId: string): Promise<DocumentDetails> {
