@@ -233,25 +233,33 @@ describe("document editor", () => {
     });
   });
 
-  it("asks before going back to the list when edits couldn't be saved", async () => {
-    mockedDocumentsApi.listDocuments.mockResolvedValue([]);
-    mockedDocumentsApi.updateDocument.mockRejectedValue(
-      new ApiError(409, "changed elsewhere"),
-    );
-    const user = userEvent.setup();
-    await openEditor();
+  it.each([
+    ["offline", new TypeError("Failed to fetch")],
+    ["a conflict", new ApiError(409, "changed elsewhere")],
+  ])(
+    "asks before going back to the list when %s stopped the save",
+    async (_label, saveError) => {
+      mockedDocumentsApi.listDocuments.mockResolvedValue([]);
+      mockedDocumentsApi.updateDocument.mockRejectedValue(saveError);
+      const user = userEvent.setup();
+      await openEditor();
 
-    await renameTo("Mine");
-    await screen.findByRole("alert");
-    await user.click(screen.getByRole("link", { name: "← Documents" }));
+      await renameTo("Mine");
+      await waitFor(() =>
+        expect(screen.getByRole("status")).toHaveTextContent(
+          /Offline|Not saved/,
+        ),
+      );
+      await user.click(screen.getByRole("link", { name: "← Documents" }));
 
-    const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Leave without saving?");
-    await user.click(within(dialog).getByRole("button", { name: "Leave" }));
-    expect(
-      await screen.findByRole("heading", { name: "My documents" }),
-    ).toBeInTheDocument();
-  });
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveTextContent("Leave without saving?");
+      await user.click(within(dialog).getByRole("button", { name: "Leave" }));
+      expect(
+        await screen.findByRole("heading", { name: "My documents" }),
+      ).toBeInTheDocument();
+    },
+  );
 
   it("shows 'Document not found' for a document the user can't access", async () => {
     mockedDocumentsApi.fetchDocument.mockRejectedValue(
