@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { MAX_SAVE_BODY_BYTES } from "@doc-editor/shared";
 import type { DbPool } from "./db/pool";
 import { createSessionMiddleware } from "./auth/sessionMiddleware";
 import {
@@ -9,13 +10,15 @@ import {
 import { createAuthRouter } from "./routes/authRoutes";
 import { createDocumentRouter } from "./routes/documentRoutes";
 import { createUserRouter } from "./routes/userRoutes";
-import { requireJsonBody } from "./http/requireJsonBody";
+import { createRequireJsonBody } from "./http/requireJsonBody";
 import { errorHandler } from "./http/errorHandler";
 import { sendError } from "./http/sendError";
 import { serveClientApp } from "./http/serveClientApp";
 
-const JSON_BODY_LIMIT = "1mb";
 const TRUSTED_PROXY_HOPS = 1;
+
+/** Routes under /api that take a file upload (multipart) instead of a JSON body. */
+const UPLOAD_PATHS = ["/documents/import"];
 
 export interface AppOptions {
   pool: DbPool;
@@ -39,7 +42,7 @@ export function createApp(options: AppOptions): Express {
     serveClientApp(app, options.clientDistDir);
   }
 
-  app.use(express.json({ limit: JSON_BODY_LIMIT }));
+  app.use(express.json({ limit: MAX_SAVE_BODY_BYTES }));
   app.use(
     createSessionMiddleware({
       pool: options.pool,
@@ -49,7 +52,7 @@ export function createApp(options: AppOptions): Express {
     }),
   );
 
-  app.use("/api", requireJsonBody);
+  app.use("/api", createRequireJsonBody({ uploadPaths: UPLOAD_PATHS }));
   app.use(
     "/api/auth",
     createAuthRouter({

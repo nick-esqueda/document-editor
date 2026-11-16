@@ -8,6 +8,7 @@ import {
   type DocumentJson,
   type DocumentListResponse,
   type DocumentRole,
+  type ImportDocumentResponse,
 } from "@doc-editor/shared";
 import type { DbPool } from "../db/pool";
 import {
@@ -27,6 +28,13 @@ import {
 import { requireAuth } from "../auth/requireAuth";
 import { sendError } from "../http/sendError";
 import { createAccessRouter } from "./accessRoutes";
+import {
+  importFile,
+  type ImportedDocument,
+  type UploadedFile,
+} from "../import/importFile";
+import { ImportRejectedError } from "../import/ImportRejectedError";
+import { receiveUploadedFile } from "../import/receiveUploadedFile";
 const STALE_VERSION_MESSAGE =
   "This document was changed elsewhere. Reload to see the latest version.";
 
@@ -52,6 +60,9 @@ export function createDocumentRouter(pool: DbPool): Router {
   );
   router.post("/", (request, response) =>
     handleCreateDocument(pool, request, response),
+  );
+  router.post("/import", receiveUploadedFile, (request, response) =>
+    handleImportDocument(pool, request, response),
   );
   router.get("/:id", (request, response) =>
     handleGetDocument(pool, request, response),
@@ -96,12 +107,58 @@ async function handleCreateDocument(
   request: Request,
   response: Response,
 ) {
-  const document = await insertDocument(
-    pool,
-    readUserId(request),
-    EMPTY_DOCUMENT,
-  );
+  const document = await insertDocument(pool, {
+    ownerId: readUserId(request),
+    content: EMPTY_DOCUMENT,
+  });
   response.status(201).json(toDocumentDetails(document, "owner"));
+}
+
+/** Creates a document from an uploaded .txt or .md file (see import/importFile.ts). */
+async function handleImportDocument(
+  pool: DbPool,
+  request: Request,
+  response: Response,
+) {
+  const uploadedFile = readUploadedFile(request);
+  const imported = importFileOrRespond(uploadedFile, response);
+  if (!imported) {
+    return;
+  }
+
+  const document = await insertDocument(pool, {
+    ownerId: readUserId(request),
+    content: imported.content,
+    title: imported.title,
+  });
+  const body: ImportDocumentResponse = {
+    id: document.id,
+    warnings: imported.warnings,
+  };
+
+  response.status(201).json(body);
+}
+
+/** request.file is always set here: receiveUploadedFile answers 400 without one. */
+function readUploadedFile(request: Request): UploadedFile {
+  const file = request.file as Express.Multer.File;
+  return { originalName: file.originalname, bytes: file.buffer };
+}
+
+function importFileOrRespond(
+  file: UploadedFile,
+  response: Response,
+): ImportedDocument | null {
+  try {
+    return importFile(file);
+  } catch (error) {
+    if (!(error instanceof ImportRejectedError)) {
+      throw error;
+    }
+
+    sendError(response, error.status, error.message);
+    return null;
+  }
 }
 
 async function handleGetDocument(
