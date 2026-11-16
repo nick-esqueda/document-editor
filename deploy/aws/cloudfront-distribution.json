@@ -1,0 +1,81 @@
+{
+  "CallerReference": "ajaia-doc-editor-prod",
+  "Comment": "Ajaia Doc Editor: React app from S3, /api/* from EC2",
+  "Enabled": true,
+  "HttpVersion": "http2and3",
+  "PriceClass": "PriceClass_100",
+  "DefaultRootObject": "index.html",
+  "Aliases": { "Quantity": 1, "Items": ["APP_DOMAIN"] },
+  "ViewerCertificate": {
+    "ACMCertificateArn": "CERTIFICATE_ARN",
+    "SSLSupportMethod": "sni-only",
+    "MinimumProtocolVersion": "TLSv1.2_2021"
+  },
+  "Origins": {
+    "Quantity": 2,
+    "Items": [
+      {
+        "Id": "frontend-s3",
+        "DomainName": "FRONTEND_BUCKET.s3.REGION.amazonaws.com",
+        "OriginAccessControlId": "OAC_ID",
+        "S3OriginConfig": { "OriginAccessIdentity": "" }
+      },
+      {
+        "Id": "api-ec2",
+        "DomainName": "ORIGIN_HOSTNAME",
+        "CustomHeaders": {
+          "Quantity": 1,
+          "Items": [
+            {
+              "HeaderName": "X-Origin-Verify",
+              "HeaderValue": "ORIGIN_VERIFY_SECRET"
+            }
+          ]
+        },
+        "CustomOriginConfig": {
+          "HTTPPort": 80,
+          "HTTPSPort": 443,
+          "OriginProtocolPolicy": "https-only",
+          "OriginSslProtocols": { "Quantity": 1, "Items": ["TLSv1.2"] },
+          "OriginReadTimeout": 30,
+          "OriginKeepaliveTimeout": 5
+        }
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "frontend-s3",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "Compress": true,
+    "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+    "AllowedMethods": {
+      "Quantity": 2,
+      "Items": ["GET", "HEAD"],
+      "CachedMethods": { "Quantity": 2, "Items": ["GET", "HEAD"] }
+    },
+    "FunctionAssociations": {
+      "Quantity": 1,
+      "Items": [
+        { "EventType": "viewer-request", "FunctionARN": "SPA_FUNCTION_ARN" }
+      ]
+    }
+  },
+  "CacheBehaviors": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "PathPattern": "/api/*",
+        "TargetOriginId": "api-ec2",
+        "ViewerProtocolPolicy": "https-only",
+        "Compress": true,
+        "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+        "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+        "AllowedMethods": {
+          "Quantity": 7,
+          "Items": ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"],
+          "CachedMethods": { "Quantity": 2, "Items": ["GET", "HEAD"] }
+        }
+      }
+    ]
+  }
+}

@@ -13,11 +13,11 @@
 - Only ports 80 and 443 are open. Admin access uses AWS Session Manager instead of SSH, and secrets live in AWS Parameter Store, not in git.
 - A nightly database backup goes to S3, kept for 14 days.
 - Two scripts deploy the frontend and backend. Automatic deploys from GitHub can come later.
-- Cost is about $15 a month.
+- Cost is about $19 a month.
 
 **Deliberately not included:** autoscaling, managed database (RDS), multiple regions, zero-downtime deploys, Terraform.
 
-**Decision for you:** do you have a domain? It's needed for proper HTTPS between CloudFront and the server. Without one, it still works on the CloudFront URL, but that last hop isn't encrypted.
+**Decisions (confirmed by Nick):** app at `ajaia.nickesqueda.com`, server at `api.ajaia.nickesqueda.com`, region `us-east-2`, DNS records added by Nick outside AWS, Nick runs the AWS steps from [docs/deploy/aws-setup.md](../deploy/aws-setup.md).
 
 ---
 
@@ -59,7 +59,8 @@ Autoscaling, RDS, multi-region, blue/green deploys. Easy to add later; not worth
 
 - t4g.small (2 vCPU, 2 GB, ARM), Amazon Linux 2023, 20 GB gp3 disk. Docker + Compose.
 - `docker-compose.prod.yml`: `caddy`, `api`, `postgres`. Postgres has no public port.
-- Security group: 443 and 80 (for certificate renewal) only. No SSH port: shell access through SSM Session Manager.
+- Security group: 443 from CloudFront's IP ranges only (AWS managed prefix list), 80 open for certificate renewal. No SSH port: shell access through SSM Session Manager.
+- CloudFront sends a secret `X-Origin-Verify` header to the server. Caddy refuses anything without it with a 403, so the API can't be reached around CloudFront.
 - Secrets (`SESSION_SECRET`, DB password) in SSM Parameter Store, pulled into the containers at start. Nothing secret in git.
 - Migrations run automatically when the API container starts. The seed runs once, with production passwords taken from Parameter Store.
 - Nightly `pg_dump` to an S3 bucket via cron, kept 14 days.
@@ -67,10 +68,10 @@ Autoscaling, RDS, multi-region, blue/green deploys. Easy to add later; not worth
 **Deploy**
 
 - `scripts/deploy-frontend.sh`: build → `aws s3 sync` → CloudFront invalidation of `/index.html`.
-- `scripts/deploy-backend.sh`: SSM command on the instance → `git pull` → `docker compose up -d --build`.
+- `scripts/deploy-backend.sh`: `git archive HEAD` → S3 → SSM command on the instance → download, `docker compose up -d --build`, wait for the API. The instance never needs GitHub access.
 - GitHub Actions can run both on merge to `main` later. Manual scripts first.
 
-**Cost:** about $15/month (EC2 ≈ $12, EBS ≈ $2, S3 + CloudFront ≈ $1 at this traffic).
+**Cost:** about $19/month (EC2 ≈ $12, public IPv4 ≈ $3.60, EBS ≈ $1.60, S3 + CloudFront ≈ $1 at this traffic).
 
 ## README outline
 
@@ -90,11 +91,12 @@ Rendered mockups. The layout and wording are what I'll build; colors and spacing
 
 ![AWS architecture (no new screens in this phase)](../wireframes/phase-5-architecture.png)
 
-## Open questions
+## Decisions
 
-- **Domain:** do you have a domain (or want one in Route 53, about $12/yr)? Caddy needs a hostname for the EC2 TLS certificate. _Without one:_ CloudFront's `*.cloudfront.net` URL for users, and EC2 serves HTTP only, with the security group locked to CloudFront's IP ranges. That works, but the CloudFront → EC2 hop isn't encrypted.
-- **Infrastructure as code:** _Default: no._ Documented console steps + scripts. Terraform is about half a day extra if you want reproducible infra.
-- **AWS account/region:** I'll write the steps for `us-east-1` unless you prefer another region. You run the AWS steps, or give me credentials through the environment's secrets.
+- **Domain:** app at `ajaia.nickesqueda.com` (CNAME to CloudFront). Server at `api.ajaia.nickesqueda.com` (A record to the Elastic IP), used only by CloudFront. DNS is outside AWS, so Nick adds three records.
+- **Region:** `us-east-2`. The CloudFront certificate is in `us-east-1`, because CloudFront requires that.
+- **Infrastructure as code:** no Terraform. Copy-paste CLI steps in [docs/deploy/aws-setup.md](../deploy/aws-setup.md), which Nick runs.
+- **Demo password in production:** generated during setup and stored only in Parameter Store.
 
 ## Acceptance criteria
 
@@ -105,6 +107,7 @@ Run against the production URL:
 - [ ] `curl -i -X POST https://<domain>/api/auth/login …` → `Set-Cookie` with `Secure; HttpOnly; SameSite=Lax`
 - [ ] The Phase 1-4 Playwright suite passes with `BASE_URL=https://<domain>`
 - [ ] `nc -zv <ec2-ip> 5432` and `nc -zv <ec2-ip> 22` → refused/timeout; only 80/443 open
+- [ ] `curl -sI https://api.ajaia.nickesqueda.com/api/auth/me` from outside AWS → timeout (443 only accepts CloudFront)
 - [ ] `aws ssm send-command … "sudo reboot"`, wait, then the Playwright smoke test passes again and earlier docs are still there
 - [ ] `aws s3 ls s3://<backup-bucket>/` shows a dump from the last 24 h; restoring it into a scratch Postgres container succeeds and row counts match
 - [ ] `git grep -nE "SESSION_SECRET=|PASSWORD="` finds only `.env.example` placeholders

@@ -14,7 +14,9 @@ import { errorHandler } from "./http/errorHandler";
 import { sendError } from "./http/sendError";
 
 const JSON_BODY_LIMIT = "1mb";
-const TRUSTED_PROXY_HOPS = 1;
+// CloudFront and Caddy each add one hop. Trusting both lets req.ip be the viewer's IP,
+// which the login rate limiter keys on.
+const TRUSTED_PROXY_HOPS = 2;
 
 export interface AppOptions {
   pool: DbPool;
