@@ -52,6 +52,14 @@ describe("serveClientApp", () => {
     },
   );
 
+  it("never caches index.html requested by name", async () => {
+    const response = await request(app).get("/index.html");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-cache");
+    expect(response.text).toBe(ENTRY_PAGE_HTML);
+  });
+
   it("serves hashed assets with a one-year immutable cache", async () => {
     const response = await request(app).get("/assets/app-abc123.js");
 

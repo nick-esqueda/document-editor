@@ -1,5 +1,5 @@
 import path from "node:path";
-import express, { type Express, type Request } from "express";
+import express, { type Express, type Request, type Response } from "express";
 
 const API_PATH_PREFIX = "/api";
 const ENTRY_PAGE_FILE = "index.html";
@@ -9,6 +9,13 @@ const HASHED_ASSET_MAX_AGE = "1y";
 const OTHER_FILE_MAX_AGE = "1h";
 // index.html must always be revalidated so users pick up the newest asset names after a deploy.
 const ENTRY_PAGE_CACHE_CONTROL = "no-cache";
+
+/** express.static hook: index.html requested by name gets the same no-cache rule as app routes. */
+function setEntryPageCacheControl(response: Response, filePath: string): void {
+  if (path.basename(filePath) === ENTRY_PAGE_FILE) {
+    response.setHeader("Cache-Control", ENTRY_PAGE_CACHE_CONTROL);
+  }
+}
 
 function isApiPath(requestPath: string): boolean {
   return (
@@ -45,7 +52,11 @@ export function serveClientApp(app: Express, clientDistDir: string): void {
     }),
   );
   app.use(
-    express.static(clientDistDir, { index: false, maxAge: OTHER_FILE_MAX_AGE }),
+    express.static(clientDistDir, {
+      index: false,
+      maxAge: OTHER_FILE_MAX_AGE,
+      setHeaders: setEntryPageCacheControl,
+    }),
   );
 
   app.use((request, response, next) => {
