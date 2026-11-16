@@ -47,6 +47,23 @@ describe("LoginPage", () => {
     );
   });
 
+  it("stays logged in when the initial session check finishes after login", async () => {
+    let finishInitialCheck: (user: null) => void = () => {};
+    mockedAuthApi.fetchCurrentUser.mockReturnValue(
+      new Promise((resolve) => (finishInitialCheck = resolve)),
+    );
+    mockedAuthApi.logIn.mockResolvedValue(ALICE);
+    renderAppAt("/login");
+
+    await fillInLoginForm("alice", "secret");
+    finishInitialCheck(null);
+
+    expect(await screen.findByText("You're logged in")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Log in" })).toBeNull(),
+    );
+  });
+
   it("disables the submit button while logging in", async () => {
     mockedAuthApi.logIn.mockReturnValue(new Promise(() => {}));
     renderAppAt("/login");
@@ -89,5 +106,20 @@ describe("AppHeader", () => {
     expect(
       await screen.findByRole("button", { name: "Log in" }),
     ).toBeInTheDocument();
+  });
+
+  it("shows an error and stays logged in when logout fails", async () => {
+    mockedAuthApi.fetchCurrentUser.mockResolvedValue(ALICE);
+    mockedAuthApi.logOut.mockRejectedValue(new Error("network down"));
+    renderAppAt("/");
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "Log out" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't log out",
+    );
+    expect(screen.getByText("You're logged in")).toBeInTheDocument();
   });
 });

@@ -1,4 +1,11 @@
+import { existsSync } from "node:fs";
 import { defineConfig } from "@playwright/test";
+
+// Use the same .env as the server (for SEED_PASSWORD). Variables already set in the shell win.
+const ENV_FILE_PATH = ".env";
+if (existsSync(ENV_FILE_PATH)) {
+  process.loadEnvFile(ENV_FILE_PATH);
+}
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5173";
 const SERVER_START_TIMEOUT_MS = 120_000;

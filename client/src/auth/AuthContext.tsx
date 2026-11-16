@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -25,21 +26,31 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  // Set once the user logs in or out, so a slower initial session check can't overwrite that.
+  const hasUserActedRef = useRef(false);
 
   useEffect(() => {
+    const applyInitialSession = (user: PublicUser | null) => {
+      if (!hasUserActedRef.current) {
+        setCurrentUser(user);
+      }
+    };
+
     fetchCurrentUser()
-      .then(setCurrentUser)
-      .catch(() => setCurrentUser(null))
+      .then(applyInitialSession)
+      .catch(() => applyInitialSession(null))
       .finally(() => setIsCheckingSession(false));
   }, []);
 
   const handleLogIn = useCallback(async (credentials: LoginRequest) => {
     const user = await logIn(credentials);
+    hasUserActedRef.current = true;
     setCurrentUser(user);
   }, []);
 
   const handleLogOut = useCallback(async () => {
     await logOut();
+    hasUserActedRef.current = true;
     setCurrentUser(null);
   }, []);
 
