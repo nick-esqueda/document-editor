@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type {
+  DocumentAccessResponse,
   DocumentListResponse,
   OwnedDocumentSummary,
   SharedDocumentSummary,
@@ -16,6 +17,7 @@ import { AppHeader } from "../components/AppHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DocumentRow } from "../documents/DocumentRow";
 import { SharedDocumentRow } from "../documents/SharedDocumentRow";
+import { ShareDialog } from "../sharing/ShareDialog";
 import { buildDocumentPath } from "../routes";
 
 const LOAD_FAILED_MESSAGE =
@@ -31,6 +33,8 @@ export function DocumentListPage() {
   const { lists, updateOwnedDocuments, errorMessage, setErrorMessage } =
     useDocumentLists();
   const [documentToDelete, setDocumentToDelete] =
+    useState<OwnedDocumentSummary | null>(null);
+  const [documentToShare, setDocumentToShare] =
     useState<OwnedDocumentSummary | null>(null);
 
   async function handleCreate() {
@@ -57,6 +61,20 @@ export function DocumentListPage() {
         current.filter((document) => document.id !== target.id),
       );
     });
+  }
+
+  function handleAccessChange(
+    documentId: string,
+    access: DocumentAccessResponse,
+  ) {
+    const sharedWithCount = access.people.length;
+    updateOwnedDocuments((current) =>
+      current.map((document) =>
+        document.id === documentId
+          ? { ...document, sharedWithCount }
+          : document,
+      ),
+    );
   }
 
   async function runAction(action: () => Promise<void>) {
@@ -91,6 +109,7 @@ export function DocumentListPage() {
         <OwnedDocumentList
           documents={lists?.owned ?? null}
           onRename={handleRename}
+          onRequestShare={setDocumentToShare}
           onRequestDelete={setDocumentToDelete}
         />
         <div className="section-head shared-section-head">
@@ -98,6 +117,16 @@ export function DocumentListPage() {
         </div>
         <SharedDocumentList documents={lists?.shared ?? null} />
       </main>
+      {documentToShare && (
+        <ShareDialog
+          documentId={documentToShare.id}
+          documentTitle={documentToShare.title}
+          onClose={() => setDocumentToShare(null)}
+          onAccessChange={(access) =>
+            handleAccessChange(documentToShare.id, access)
+          }
+        />
+      )}
       {documentToDelete && (
         <ConfirmDialog
           title={`Delete "${documentToDelete.title}"?`}
@@ -114,12 +143,14 @@ export function DocumentListPage() {
 interface OwnedDocumentListProps {
   documents: OwnedDocumentSummary[] | null;
   onRename: (document: OwnedDocumentSummary, title: string) => void;
+  onRequestShare: (document: OwnedDocumentSummary) => void;
   onRequestDelete: (document: OwnedDocumentSummary) => void;
 }
 
 function OwnedDocumentList({
   documents,
   onRename,
+  onRequestShare,
   onRequestDelete,
 }: OwnedDocumentListProps) {
   if (documents === null) {
@@ -141,6 +172,7 @@ function OwnedDocumentList({
           key={document.id}
           document={document}
           onRename={onRename}
+          onRequestShare={onRequestShare}
           onRequestDelete={onRequestDelete}
         />
       ))}

@@ -3,13 +3,16 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as authApi from "../src/api/authApi";
 import * as documentsApi from "../src/api/documentsApi";
+import * as usersApi from "../src/api/usersApi";
 import { ALICE, renderAppAt } from "./renderWithAuth";
 import { buildDocumentDetails, EMPTY_DOCUMENT_LISTS } from "./documentFixtures";
 
 vi.mock("../src/api/authApi");
 vi.mock("../src/api/documentsApi");
+vi.mock("../src/api/usersApi");
 const mockedAuthApi = vi.mocked(authApi);
 const mockedDocumentsApi = vi.mocked(documentsApi);
+const mockedUsersApi = vi.mocked(usersApi);
 
 const MINUTE_MS = 60 * 1000;
 const NOW = Date.now();
@@ -171,6 +174,40 @@ describe("document list", () => {
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("shares from the row menu and updates the shared count", async () => {
+    const bob = { id: "user-bob", username: "bob", displayName: "Bob" };
+    mockedDocumentsApi.fetchDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [],
+    });
+    mockedDocumentsApi.grantDocumentAccess.mockResolvedValue({
+      owner: ALICE,
+      people: [bob],
+    });
+    mockedUsersApi.listUsers.mockResolvedValue([ALICE, bob]);
+    renderAppAt("/");
+
+    const user = await openRowMenu(OLDER.title);
+    await user.click(screen.getByRole("menuitem", { name: "Share" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(`Share "${OLDER.title}"`);
+    await user.selectOptions(
+      await within(dialog).findByLabelText("Add people"),
+      "Bob",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    expect(mockedDocumentsApi.grantDocumentAccess).toHaveBeenCalledWith(
+      OLDER.id,
+      bob.id,
+    );
+    const rows = within(
+      screen.getByRole("list", { name: "My documents" }),
+    ).getAllByRole("listitem");
+    expect(rows[1]).toHaveTextContent("Shared with 1");
   });
 
   it("keeps the document when delete is cancelled", async () => {

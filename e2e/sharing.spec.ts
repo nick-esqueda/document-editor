@@ -109,3 +109,28 @@ test("bob sees who owns a shared doc and has no share or delete controls", async
   await expect(bob.getByRole("button", { name: /Delete/ })).toHaveCount(0);
   await expect(bob.getByRole("menuitem", { name: "Delete" })).toHaveCount(0);
 });
+
+test("alice can share from the document list menu", async ({ browser }) => {
+  const alice = await openPageAs(browser, "alice");
+  const { title } = await createTitledDocument(alice, "List share");
+  await alice.getByRole("link", { name: "← Documents" }).click();
+
+  await alice
+    .getByRole("button", { name: `More actions for ${title}` })
+    .click();
+  await alice.getByRole("menuitem", { name: "Share" }).click();
+  const dialog = alice.getByRole("dialog");
+  await dialog.getByLabel("Add people").selectOption({ label: "Bob" });
+  await dialog.getByRole("button", { name: "Add" }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Remove Bob" }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  const row = alice.getByRole("listitem").filter({ hasText: title });
+  await expect(row).toContainText("Shared with 1");
+  const bob = await openPageAs(browser, "bob");
+  await expect(
+    getSharedWithMeList(bob).getByRole("link", { name: title }),
+  ).toBeVisible();
+});

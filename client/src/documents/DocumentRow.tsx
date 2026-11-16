@@ -17,6 +17,7 @@ import { formatEditedTime } from "./formatEditedTime";
 interface DocumentRowProps {
   document: OwnedDocumentSummary;
   onRename: (document: OwnedDocumentSummary, title: string) => void;
+  onRequestShare: (document: OwnedDocumentSummary) => void;
   onRequestDelete: (document: OwnedDocumentSummary) => void;
 }
 
@@ -25,6 +26,7 @@ type RowMode = "idle" | "menuOpen" | "renaming";
 export function DocumentRow({
   document,
   onRename,
+  onRequestShare,
   onRequestDelete,
 }: DocumentRowProps) {
   const [mode, setMode] = useState<RowMode>("idle");
@@ -79,6 +81,16 @@ export function DocumentRow({
             onClick={() => setMode("renaming")}
           >
             Rename
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMode("idle");
+              onRequestShare(document);
+            }}
+          >
+            Share
           </button>
           <button
             type="button"

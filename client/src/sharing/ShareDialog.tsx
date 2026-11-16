@@ -15,6 +15,8 @@ interface ShareDialogProps {
   documentId: string;
   documentTitle: string;
   onClose: () => void;
+  /** Called after each successful change, e.g. so the list can update its "Shared with N" pill. */
+  onAccessChange?: (access: DocumentAccessResponse) => void;
 }
 
 /** Owner-only dialog for choosing who else can open and edit the document. */
@@ -22,6 +24,7 @@ export function ShareDialog({
   documentId,
   documentTitle,
   onClose,
+  onAccessChange,
 }: ShareDialogProps) {
   const { access, setAccess, users, errorMessage, setErrorMessage } =
     useSharingDetails(documentId);
@@ -42,16 +45,24 @@ export function ShareDialog({
     }
   }
 
+  function showChangedAccess(changed: DocumentAccessResponse) {
+    setAccess(changed);
+    onAccessChange?.(changed);
+  }
+
   function handleAdd(userId: string) {
     return runAction(async () => {
-      setAccess(await grantDocumentAccess(documentId, userId));
+      showChangedAccess(await grantDocumentAccess(documentId, userId));
     });
   }
 
   function handleRemove(user: PublicUser) {
     return runAction(async () => {
       await revokeDocumentAccess(documentId, user.id);
-      setAccess((current) => current && removePerson(current, user.id));
+      // Changes run one at a time, so `access` is current here.
+      showChangedAccess(
+        removePerson(access as DocumentAccessResponse, user.id),
+      );
     });
   }
 
