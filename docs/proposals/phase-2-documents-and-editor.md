@@ -10,7 +10,7 @@
 
 - A `documents` table stores the title and the content as Tiptap JSON (`jsonb`), never HTML.
 - The server checks every save against the same editor schema the browser uses and rejects anything unknown, so stored content can't carry scripts.
-- Autosave fires 1 second after you stop typing (at least every 5 seconds while typing).
+- Autosave fires once, 1 second after you stop typing (and at most every 5 seconds during long typing). It only saves when something changed, so an idle document makes no save calls.
 - Each save sends a version number. If someone else saved first (possible once sharing exists), you get a "changed elsewhere, reload" banner instead of silently overwriting their work.
 - If you don't own a doc, the API answers 404 as if it doesn't exist.
 
@@ -63,7 +63,8 @@ Tiptap with only what we need: paragraph, heading (H1-H3), bold, italic, underli
 
 ## Autosave
 
-- Save 1 s after typing stops, and at least every 5 s while typing continues.
+- Save once, 1 s after typing stops, and at most every 5 s while typing continues.
+- Only save when there are unsaved changes. After a successful save nothing runs until the next edit, so an open but idle document sends no requests. A failed save retries with backoff until it succeeds.
 - Title saves on blur / Enter.
 - Status in the header: **Saving…** → **Saved** → **Offline, retrying** (exponential backoff).
 - On tab close with unsaved changes: one last `fetch(..., {keepalive: true})` plus the browser "leave page?" prompt.
