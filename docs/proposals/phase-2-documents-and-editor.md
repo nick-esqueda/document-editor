@@ -99,7 +99,7 @@ API tests: create/list/get/patch; another user gets 404 on every route; invalid 
 ## Open questions
 
 - ~~**Delete:** include owner-only delete?~~ **Decided (Nick):** yes. Only the owner can delete, even when the doc is shared. Deleting a shared doc removes it for everyone it was shared with.
-- **Trash/undo delete:** *Default: no, a confirm dialog is enough.*
+- ~~**Trash/undo delete:**~~ **Decided (Nick):** no. A confirm dialog is enough.
 
 ## Acceptance criteria
 
