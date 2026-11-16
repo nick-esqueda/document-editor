@@ -112,7 +112,20 @@ describe("login rate limiting", () => {
   const pool = useTestPool();
   const MAX_ATTEMPTS = DEFAULT_LOGIN_RATE_LIMIT.maxAttempts;
 
-  it("returns 429 on the 11th attempt within a minute", async () => {
+  it("doesn't count successful logins toward the limit", async () => {
+    const app = createTestApp(pool, {
+      loginRateLimit: DEFAULT_LOGIN_RATE_LIMIT,
+    });
+
+    for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
+      await postLogin(app, "alice");
+    }
+    const response = await postLogin(app, "alice");
+
+    expect(response.status).toBe(200);
+  });
+
+  it("returns 429 on the 11th failed attempt within a minute", async () => {
     const app = createTestApp(pool, {
       loginRateLimit: DEFAULT_LOGIN_RATE_LIMIT,
     });
