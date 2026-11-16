@@ -2,6 +2,24 @@
 
 **Goal:** the app runs on AWS at a public HTTPS URL, and the README lets anyone run it locally or redeploy it.
 
+## Summary (1-2 min read)
+
+**What you get:** the app live on AWS at an HTTPS URL, plus a README that explains what it is, how to run it locally in a few minutes, how it's built, and how to redeploy.
+
+**How it's built:**
+- CloudFront is the single front door. It serves the React app from a private S3 bucket and forwards `/api/*` to the server, so the login cookie just works with no cross-site setup.
+- One EC2 instance (t4g.small) runs the API, Postgres and Caddy (for HTTPS) in Docker, the same way it runs locally.
+- Only ports 80 and 443 are open. Admin access uses AWS Session Manager instead of SSH, and secrets live in AWS Parameter Store, not in git.
+- A nightly database backup goes to S3, kept for 14 days.
+- Two scripts deploy the frontend and backend. Automatic deploys from GitHub can come later.
+- Cost is about $15 a month.
+
+**Deliberately not included:** autoscaling, managed database (RDS), multiple regions, zero-downtime deploys, Terraform.
+
+**Decision for you:** do you have a domain? It's needed for proper HTTPS between CloudFront and the server. Without one, it still works on the CloudFront URL, but that last hop isn't encrypted.
+
+---
+
 ## Scope
 
 S3 + CloudFront for the frontend, one EC2 instance running the API and Postgres in Docker, HTTPS, secrets handling, nightly database backup, deploy script, README.

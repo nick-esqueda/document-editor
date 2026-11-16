@@ -2,6 +2,23 @@
 
 **Goal:** a logged-in user can create a document, rename it, format text, have it autosave, and reopen it later. Documents are private to their owner in this phase.
 
+## Summary (1-2 min read)
+
+**What you get:** a "My documents" list with a New document button. Each doc opens in a Tiptap editor with a toolbar for bold, italic, underline, H1-H3 and bulleted/numbered lists. Click the title to rename it. Changes autosave and the header shows Saving… / Saved / Offline, retrying. Close the tab, come back, and everything is still there.
+
+**How it's built:**
+- A `documents` table stores the title and the content as Tiptap JSON (`jsonb`), never HTML.
+- The server checks every save against the same editor schema the browser uses and rejects anything unknown, so stored content can't carry scripts.
+- Autosave fires 1 second after you stop typing (at least every 5 seconds while typing).
+- Each save sends a version number. If someone else saved first (possible once sharing exists), you get a "changed elsewhere, reload" banner instead of silently overwriting their work.
+- If you don't own a doc, the API answers 404 as if it doesn't exist.
+
+**Deliberately not included:** sharing, upload, comments, version history, images, tables, links.
+
+**Decision for you:** should owners be able to delete docs? I'll include owner-only delete with a confirm dialog unless you say no.
+
+---
+
 ## Scope
 
 document list (owned docs), create, rename, open, Tiptap editor with toolbar, debounced autosave, save status, version conflict check, owner-only delete *(default, see open questions)*.

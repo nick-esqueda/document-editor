@@ -6,7 +6,7 @@
 
 ## Phases
 
-Each phase gets its own proposal doc (linked) that you approve before I write code.
+Each phase gets its own proposal doc (linked), which opens with a 1-2 minute summary. You approve each one before I write code.
 
 | # | Phase | You'll be able to… |
 |---|-------|--------------------|

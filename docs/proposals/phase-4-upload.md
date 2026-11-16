@@ -2,6 +2,23 @@
 
 **Goal:** a user uploads a `.txt` or `.md` file and it becomes a new document they own, which they can edit like any other.
 
+## Summary (1-2 min read)
+
+**What you get:** an Upload button on the document list (drag and drop works too), labelled "Supports .txt and .md, up to 1 MB". The uploaded file becomes a new document you own and opens straight in the editor.
+
+**How it's built:**
+- The file goes to the server, which checks the type and size and rejects anything that isn't real text.
+- Markdown is converted with markdown-it, with raw HTML turned off, then into Tiptap JSON. Plain text becomes paragraphs.
+- The result passes the same schema check as normal saves, so an upload can't sneak in anything the editor wouldn't allow.
+- Markdown features the editor doesn't support are simplified, not lost silently. Tables become text, H4-H6 become H3, and images are dropped. A note tells you when this happened.
+- Wrong type, too large and binary files each get a clear error message.
+
+**Deliberately not included:** `.docx` (stretch goal), PDF, HTML, importing into an existing doc, bulk upload.
+
+**Decision for you:** none. This phase follows what we already agreed.
+
+---
+
 ## Scope
 
 `.txt` and `.md`, up to 1 MB, one file at a time; supported types stated in the UI and README.

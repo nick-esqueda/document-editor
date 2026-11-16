@@ -2,6 +2,23 @@
 
 **Goal:** `docker compose up`, open the browser, log in as a seeded user, see an empty app shell. Everything later builds on this.
 
+## Summary (1-2 min read)
+
+**What you get:** clone the repo, run `docker compose up`, open the browser and log in as alice, bob or carol. After login you see an empty app shell with your name and a Log out button.
+
+**How it's built:**
+- One repo with three packages: `client/` (React + Vite), `server/` (Express) and `shared/` (types and the editor schema, used by both sides from Phase 2 on).
+- Postgres runs in Docker. Tables are created by migration files, and a seed script adds the three demo users with bcrypt-hashed passwords.
+- Login sets an `httpOnly` session cookie stored in Postgres. The server only ever trusts the user id in the session, never one sent by the browser.
+- Login is rate-limited, and a wrong username and a wrong password give the same error.
+- Tests (Vitest + supertest) and lint run in GitHub Actions from day one.
+
+**Deliberately not included:** sign-up, password reset, roles, OAuth.
+
+**Decision for you:** none. This phase follows what we already agreed.
+
+---
+
 ## Scope
 
 monorepo, Docker Compose, database migrations, seeded users, login/logout, session cookie, auth middleware, app shell, test setup.

@@ -2,6 +2,23 @@
 
 **Goal:** an owner can give another user access to a document. Access means read + edit. The list clearly separates docs you own from docs shared with you.
 
+## Summary (1-2 min read)
+
+**What you get:** a Share button (owner only) opens a dialog where you pick a user and add or remove them. Anyone you share with can open and edit the doc. The list now has two sections, **My documents** and **Shared with me**, and shared docs show who owns them.
+
+**How it's built:**
+- A `document_access` table records who was given access to which doc.
+- The access check from Phase 2 widens from "owner" to "owner or given access". It's one helper used by every route, so there's a single place to get it right.
+- Only the owner can share, unshare or delete. Shared users get 403 if they try, and everyone else still gets 404.
+- If access is removed while someone has the doc open, their next save fails and they see "You no longer have access."
+- Two people editing at the same time is handled by Phase 2's version check.
+
+**Deliberately not included:** view-only or comment levels, share links, notifications, transferring ownership.
+
+**Decision for you:** can shared users rename a doc? I'll say yes (renaming counts as editing) unless you prefer owner-only.
+
+---
+
 ## Scope
 
 grant and revoke access, share dialog, "Shared with me" section, access checks widened to "owner or granted".
