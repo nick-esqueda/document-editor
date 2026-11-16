@@ -71,4 +71,20 @@ describe("validateDocumentContent", () => {
   ])("rejects %s", (_label, content) => {
     expectRejected(content, /document object/);
   });
+
+  it.each([
+    ["object content", { type: "doc", content: {} }],
+    ["string content", { type: "doc", content: "abc" }],
+    ["object marks", buildDocument(buildParagraph("x", { marks: {} }))],
+    ["string attrs", buildDocument(buildParagraph("x", { attrs: "level" }))],
+    [
+      "object marks on text",
+      buildDocument({
+        type: "paragraph",
+        content: [{ type: "text", text: "x", marks: {} }],
+      }),
+    ],
+  ])("rejects %s without throwing", (_label, content) => {
+    expectRejected(content, /Invalid attrs, marks or content/);
+  });
 });

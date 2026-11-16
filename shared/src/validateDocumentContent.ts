@@ -17,6 +17,7 @@ interface JsonNode {
  */
 const CONTENT_CHECKS: Array<(content: unknown) => string | null> = [
   findRootProblem,
+  (content) => findShapeProblem(content as JsonNode),
   (content) => findAttributeProblem(content as JsonNode),
   (content) => findHeadingLevelProblem(content as JsonNode),
   findSchemaProblem,
@@ -46,6 +47,24 @@ function findRootProblem(content: unknown): string | null {
   return isDocument
     ? null
     : 'Content must be a document object with type "doc"';
+}
+
+/** Makes sure attrs, marks and content have the right JSON types, so later checks can walk them safely. */
+function findShapeProblem(node: JsonNode): string | null {
+  const hasValidAttrs = node.attrs === undefined || isPlainObject(node.attrs);
+  const childLists = [node.marks, node.content];
+  const hasValidChildLists = childLists.every(
+    (children) => children === undefined || Array.isArray(children),
+  );
+
+  if (!hasValidAttrs || !hasValidChildLists) {
+    return `Invalid attrs, marks or content on ${String(node.type)}`;
+  }
+
+  return findFirstProblem(
+    [...(node.marks ?? []), ...(node.content ?? [])],
+    findShapeProblem,
+  );
 }
 
 /** ProseMirror silently drops unknown attributes; we reject them instead. */

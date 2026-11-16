@@ -183,6 +183,72 @@ describe("AutosaveController", () => {
     },
   );
 
+  it("sends unsaved edits once when the editor closes", async () => {
+    const save = createSucceedingSave();
+    const controller = new AutosaveController(1, save);
+
+    typeCharacter(controller, "a");
+    controller.close();
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(save).toHaveBeenCalledOnce();
+  });
+
+  it("after closing, sends edits made during a running save with the new version", async () => {
+    const save = createSucceedingSave();
+    const controller = new AutosaveController(1, save);
+
+    controller.recordChange({ title: "First" });
+    const runningSave = controller.saveNow();
+    controller.recordChange({ title: "Second" });
+    controller.close();
+    await runningSave;
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(save.mock.calls.map(([request]) => request)).toEqual([
+      { version: 1, title: "First" },
+      { version: 2, title: "Second" },
+    ]);
+  });
+
+  it("never retries once the editor has closed", async () => {
+    const save = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const controller = new AutosaveController(1, save);
+
+    typeCharacter(controller, "a");
+    await vi.advanceTimersByTimeAsync(debounceMs);
+    controller.close();
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it("marks edits as at risk only when saving is failing", async () => {
+    const save = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const controller = new AutosaveController(1, save);
+
+    typeCharacter(controller, "a");
+    expect(controller.hasChangesAtRisk()).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(debounceMs);
+    expect(controller.hasChangesAtRisk()).toBe(true);
+  });
+
+  it("builds a final save that includes a save still in progress", () => {
+    const save = vi.fn(() => new Promise<DocumentDetails>(() => {}));
+    const controller = new AutosaveController(1, save);
+
+    controller.recordChange({ title: "First" });
+    void controller.saveNow();
+    typeCharacter(controller, "body");
+
+    expect(controller.readFinalSaveRequest()).toMatchObject({
+      version: 1,
+      title: "First",
+      content: { type: "doc" },
+    });
+  });
+
   it("saves immediately when asked, e.g. after a title change", async () => {
     const save = createSucceedingSave();
     const controller = new AutosaveController(3, save);

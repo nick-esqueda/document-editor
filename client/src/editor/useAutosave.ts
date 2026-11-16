@@ -13,30 +13,43 @@ export function useAutosave(documentId: string, initialVersion: number) {
   const [status, setStatus] = useState<SaveStatus>(controller.getStatus());
 
   useEffect(() => controller.onStatusChange(setStatus), [controller]);
-  useEffect(() => () => controller.dispose(), [controller]);
+  useEffect(() => {
+    controller.open();
+    return () => controller.close();
+  }, [controller]);
   useUnsavedChangesGuard(documentId, controller);
 
   return { controller, status };
 }
 
-/** Warns before leaving with unsaved edits, and sends them one last time as the tab closes. */
+/**
+ * Warns before the tab closes with unsaved work. The last save is sent on
+ * `pagehide`, once the user has actually left, so staying on the page never
+ * leaves a save behind that the editor doesn't know about.
+ */
 function useUnsavedChangesGuard(
   documentId: string,
   controller: AutosaveController,
 ) {
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
-      if (!controller.hasUnsavedWork()) {
-        return;
+      if (controller.hasUnsavedWork()) {
+        event.preventDefault();
       }
+    }
 
-      if (controller.hasUnsavedChanges()) {
-        sendFinalSave(documentId, controller.readPendingRequest());
+    // Also resends a save still in progress, because closing the tab can cancel it.
+    function handlePageHide() {
+      if (controller.hasUnsavedWork()) {
+        sendFinalSave(documentId, controller.readFinalSaveRequest());
       }
-      event.preventDefault();
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
   }, [documentId, controller]);
 }

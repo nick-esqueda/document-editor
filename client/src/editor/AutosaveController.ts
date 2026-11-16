@@ -55,9 +55,10 @@ const PERMANENT_FAILURE_BY_HTTP_STATUS: Record<number, SaveStatus> = {
  */
 export class AutosaveController {
   private pendingChanges: PendingChanges = {};
+  private inFlightChanges: PendingChanges | null = null;
   private status: SaveStatus = "saved";
   private version: number;
-  private isRequestInFlight = false;
+  private isClosed = false;
   private retryAttempt = 0;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private maxWaitTimer: ReturnType<typeof setTimeout> | null = null;
@@ -82,12 +83,27 @@ export class AutosaveController {
 
   /** True while there's anything not yet confirmed saved, including a save in progress. */
   hasUnsavedWork(): boolean {
-    return this.hasUnsavedChanges() || this.isRequestInFlight;
+    return this.hasUnsavedChanges() || this.inFlightChanges !== null;
   }
 
-  /** Returns what still needs saving, with the version it's based on. */
-  readPendingRequest(): UpdateDocumentRequest {
-    return { version: this.version, ...this.pendingChanges };
+  /** True when there are edits that leaving now would most likely lose. */
+  hasChangesAtRisk(): boolean {
+    return (
+      this.hasUnsavedChanges() &&
+      (this.status === "offline" || this.isStopped())
+    );
+  }
+
+  /**
+   * Everything not yet confirmed saved, for one last request as the tab closes.
+   * Includes a save still in progress, so this request is complete on its own.
+   */
+  readFinalSaveRequest(): UpdateDocumentRequest {
+    return {
+      version: this.version,
+      ...this.inFlightChanges,
+      ...this.pendingChanges,
+    };
   }
 
   onStatusChange(listener: (status: SaveStatus) => void): () => void {
@@ -97,7 +113,7 @@ export class AutosaveController {
 
   /** Records an edit and schedules a save. Ignored once saving has stopped for good. */
   recordChange(changes: PendingChanges): void {
-    if (this.isStopped()) {
+    if (this.isClosed || this.isStopped()) {
       return;
     }
 
@@ -108,7 +124,7 @@ export class AutosaveController {
       return;
     }
 
-    this.setStatus(this.isRequestInFlight ? "saving" : "unsaved");
+    this.setStatus(this.inFlightChanges ? "saving" : "unsaved");
     this.restartDebounceTimer();
     this.maxWaitTimer ??= setTimeout(
       () => void this.saveNow(),
@@ -120,35 +136,54 @@ export class AutosaveController {
   async saveNow(): Promise<void> {
     this.clearTimers();
 
-    if (
-      !this.hasUnsavedChanges() ||
-      this.isRequestInFlight ||
-      this.isStopped()
-    ) {
-      return;
+    if (!this.isClosed && this.canSendNow()) {
+      await this.sendPendingChanges();
     }
+  }
 
-    const request = this.readPendingRequest();
+  /** Marks the editor as open. Called again when React StrictMode re-runs effects. */
+  open(): void {
+    this.isClosed = false;
+  }
+
+  /**
+   * The editor closed (e.g. "← Documents"): stops timers and sends unsaved edits
+   * once, without retrying, so leaving inside the app doesn't drop them.
+   */
+  close(): void {
+    this.isClosed = true;
+    this.clearTimers();
+
+    if (this.canSendNow()) {
+      void this.sendPendingChanges();
+    }
+  }
+
+  private canSendNow(): boolean {
+    return (
+      this.hasUnsavedChanges() &&
+      this.inFlightChanges === null &&
+      !this.isStopped()
+    );
+  }
+
+  private async sendPendingChanges(): Promise<void> {
+    const changes = this.pendingChanges;
+    const request = { version: this.version, ...changes };
+    this.inFlightChanges = changes;
     this.pendingChanges = {};
-    this.isRequestInFlight = true;
     this.setStatus("saving");
 
     try {
       const saved = await this.save(request);
       this.handleSaveSucceeded(saved);
     } catch (error) {
-      this.handleSaveFailed(request, error);
+      this.handleSaveFailed(error);
     } finally {
-      this.isRequestInFlight = false;
+      this.inFlightChanges = null;
     }
 
     this.scheduleFollowUpSave();
-  }
-
-  /** Stops all timers, e.g. when the editor unmounts. */
-  dispose(): void {
-    this.clearTimers();
-    this.statusListeners.clear();
   }
 
   private handleSaveSucceeded(saved: DocumentDetails): void {
@@ -157,23 +192,27 @@ export class AutosaveController {
     this.setStatus(this.hasUnsavedChanges() ? "unsaved" : "saved");
   }
 
-  private handleSaveFailed(
-    failedRequest: UpdateDocumentRequest,
-    error: unknown,
-  ): void {
+  private handleSaveFailed(error: unknown): void {
     const httpStatus = error instanceof ApiError ? error.status : undefined;
     const permanentStatus = httpStatus
       ? PERMANENT_FAILURE_BY_HTTP_STATUS[httpStatus]
       : undefined;
 
     // Put the unsent edits back, keeping anything typed while the request was out.
-    const { version, ...failedChanges } = failedRequest;
-    this.pendingChanges = { ...failedChanges, ...this.pendingChanges };
+    this.pendingChanges = { ...this.inFlightChanges, ...this.pendingChanges };
     this.setStatus(permanentStatus ?? "offline");
   }
 
   /** After a request finishes: retry if offline, or save edits made while it was in flight. */
   private scheduleFollowUpSave(): void {
+    if (this.isClosed) {
+      // Once closed, only edits made during the last request are sent, and never retried.
+      if (this.status === "unsaved") {
+        void this.sendPendingChanges();
+      }
+      return;
+    }
+
     if (this.status === "offline") {
       this.scheduleRetry();
       return;

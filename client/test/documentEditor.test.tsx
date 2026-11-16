@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as authApi from "../src/api/authApi";
 import * as documentsApi from "../src/api/documentsApi";
@@ -192,7 +192,7 @@ describe("document editor", () => {
     expect(mockedDocumentsApi.updateDocument).toHaveBeenCalledOnce();
   });
 
-  it("asks before leaving with unsaved work and sends a final save", async () => {
+  it("asks before leaving with unsaved work, and sends the final save only once the page is left", async () => {
     mockedDocumentsApi.updateDocument.mockReturnValue(new Promise(() => {}));
     await openEditor();
     expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
@@ -202,10 +202,55 @@ describe("document editor", () => {
     const event = dispatchBeforeUnload();
 
     expect(event.defaultPrevented).toBe(true);
+    expect(mockedDocumentsApi.sendFinalSave).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new Event("pagehide"));
     expect(mockedDocumentsApi.sendFinalSave).toHaveBeenCalledWith("doc-1", {
       version: 7,
       title: "Second",
     });
+  });
+
+  it("saves pending edits when going back to the document list", async () => {
+    mockedDocumentsApi.listDocuments.mockResolvedValue([]);
+    mockedDocumentsApi.updateDocument.mockResolvedValue({
+      ...SAVED_DOCUMENT,
+      version: 8,
+    });
+    const user = userEvent.setup();
+    const content = await openEditor();
+
+    await user.type(content, "!");
+    await user.click(screen.getByRole("link", { name: "← Documents" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "My documents" }),
+    ).toBeInTheDocument();
+    expect(mockedDocumentsApi.updateDocument).toHaveBeenCalledOnce();
+    expect(mockedDocumentsApi.updateDocument.mock.calls[0][1]).toMatchObject({
+      version: 7,
+      content: { type: "doc" },
+    });
+  });
+
+  it("asks before going back to the list when edits couldn't be saved", async () => {
+    mockedDocumentsApi.listDocuments.mockResolvedValue([]);
+    mockedDocumentsApi.updateDocument.mockRejectedValue(
+      new ApiError(409, "changed elsewhere"),
+    );
+    const user = userEvent.setup();
+    await openEditor();
+
+    await renameTo("Mine");
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("link", { name: "← Documents" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Leave without saving?");
+    await user.click(within(dialog).getByRole("button", { name: "Leave" }));
+    expect(
+      await screen.findByRole("heading", { name: "My documents" }),
+    ).toBeInTheDocument();
   });
 
   it("shows 'Document not found' for a document the user can't access", async () => {

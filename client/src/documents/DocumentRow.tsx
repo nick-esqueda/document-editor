@@ -1,4 +1,11 @@
-import { useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from "react";
 import { Link } from "react-router";
 import { MAX_TITLE_LENGTH, type DocumentSummary } from "@doc-editor/shared";
 import { buildDocumentPath } from "../routes";
@@ -18,6 +25,11 @@ export function DocumentRow({
   onRequestDelete,
 }: DocumentRowProps) {
   const [mode, setMode] = useState<RowMode>("idle");
+  const kebabRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuAreaRefs] = useState(() => [kebabRef, menuRef]);
+  const closeMenu = useCallback(() => setMode("idle"), []);
+  useCloseMenuOnOutsideClick(mode === "menuOpen", menuAreaRefs, closeMenu);
 
   function handleRenameSubmit(title: string) {
     setMode("idle");
@@ -46,6 +58,7 @@ export function DocumentRow({
       <button
         type="button"
         className="kebab"
+        ref={kebabRef}
         aria-label={`More actions for ${document.title}`}
         aria-expanded={mode === "menuOpen"}
         onClick={() => setMode(mode === "menuOpen" ? "idle" : "menuOpen")}
@@ -53,7 +66,7 @@ export function DocumentRow({
         ⋮
       </button>
       {mode === "menuOpen" && (
-        <div className="menu" role="menu">
+        <div className="menu" role="menu" ref={menuRef}>
           <button
             type="button"
             role="menuitem"
@@ -76,6 +89,42 @@ export function DocumentRow({
       )}
     </li>
   );
+}
+
+/** While the menu is open, closes it on a click outside it (or its button) or on Escape. */
+function useCloseMenuOnOutsideClick(
+  isMenuOpen: boolean,
+  menuAreaRefs: Array<RefObject<HTMLElement | null>>,
+  closeMenu: () => void,
+) {
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const isInsideMenuArea = menuAreaRefs.some((ref) =>
+        ref.current?.contains(event.target as Node),
+      );
+
+      if (!isInsideMenuArea) {
+        closeMenu();
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeMenu();
+      }
+    }
+
+    window.document.addEventListener("pointerdown", handlePointerDown);
+    window.document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.document.removeEventListener("pointerdown", handlePointerDown);
+      window.document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen, menuAreaRefs, closeMenu]);
 }
 
 function RenameForm({

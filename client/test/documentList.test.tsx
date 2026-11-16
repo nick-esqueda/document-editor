@@ -102,6 +102,24 @@ describe("document list", () => {
     ).toBeInTheDocument();
   });
 
+  it("closes the row menu on a click outside it", async () => {
+    renderAppAt("/");
+
+    const user = await openRowMenu(OLDER.title);
+    await user.click(screen.getByRole("heading", { name: "My documents" }));
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("closes the row menu on Escape", async () => {
+    renderAppAt("/");
+
+    const user = await openRowMenu(OLDER.title);
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
   it("keeps the document when delete is cancelled", async () => {
     renderAppAt("/");
 
