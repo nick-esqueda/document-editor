@@ -14,6 +14,8 @@ COPY client/package.json client/
 RUN npm ci --omit=dev --workspace server --include-workspace-root=false \
   && npm cache clean --force
 
+# Both workspace tsconfig files extend this one, and tsx reads them at runtime.
+COPY tsconfig.base.json ./
 COPY shared shared
 COPY server server
 

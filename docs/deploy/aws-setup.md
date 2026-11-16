@@ -198,16 +198,21 @@ aws cloudfront publish-function --name ajaia-spa-routing --if-match "$FUNCTION_E
 SPA_FUNCTION_ARN=$(aws cloudfront describe-function --name ajaia-spa-routing --stage LIVE \
   --query FunctionSummary.FunctionMetadata.FunctionARN --output text)
 
+# The filled-in config holds the origin secret: write it to a private temp file (mode 600)
+# that is removed even if a command below fails.
+DISTRIBUTION_CONFIG_FILE=$(mktemp)
+trap 'rm -f "$DISTRIBUTION_CONFIG_FILE"' EXIT
 ORIGIN_VERIFY_SECRET=$(aws ssm get-parameter --name /ajaia/prod/ORIGIN_VERIFY_SECRET \
   --with-decryption --query Parameter.Value --output text)
 sed -e "s|APP_DOMAIN|$APP_DOMAIN|g" -e "s|CERTIFICATE_ARN|$CERT_ARN|g" \
   -e "s|FRONTEND_BUCKET|$FRONTEND_BUCKET|g" -e "s|REGION|$AWS_REGION|g" -e "s|OAC_ID|$OAC_ID|g" \
   -e "s|ORIGIN_HOSTNAME|$ORIGIN_HOSTNAME|g" -e "s|ORIGIN_VERIFY_SECRET|$ORIGIN_VERIFY_SECRET|g" \
   -e "s|SPA_FUNCTION_ARN|$SPA_FUNCTION_ARN|g" \
-  deploy/aws/cloudfront-distribution.json > /tmp/ajaia-distribution.json
-DISTRIBUTION_ID=$(aws cloudfront create-distribution --distribution-config file:///tmp/ajaia-distribution.json \
+  deploy/aws/cloudfront-distribution.json > "$DISTRIBUTION_CONFIG_FILE"
+DISTRIBUTION_ID=$(aws cloudfront create-distribution --distribution-config "file://$DISTRIBUTION_CONFIG_FILE" \
   --query Distribution.Id --output text)
-rm /tmp/ajaia-distribution.json   # it contains the origin secret
+rm -f "$DISTRIBUTION_CONFIG_FILE"
+trap - EXIT
 
 sed -e "s|FRONTEND_BUCKET|$FRONTEND_BUCKET|g" -e "s|ACCOUNT_ID|$ACCOUNT_ID|g" \
   -e "s|DISTRIBUTION_ID|$DISTRIBUTION_ID|g" \
