@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { DocumentAccessResponse, PublicUser } from "@doc-editor/shared";
 import {
   fetchDocumentAccess,
@@ -6,6 +6,7 @@ import {
   revokeDocumentAccess,
 } from "../api/documentsApi";
 import { listUsers } from "../api/usersApi";
+import { useModalFocus } from "../components/useModalFocus";
 
 const LOAD_FAILED_MESSAGE = "Sharing details couldn't be loaded.";
 const ACTION_FAILED_MESSAGE = "That didn't work. Please try again.";
@@ -24,13 +25,20 @@ export function ShareDialog({
 }: ShareDialogProps) {
   const { access, setAccess, users, errorMessage, setErrorMessage } =
     useSharingDetails(documentId);
+  // One change at a time, so a slow response can't overwrite a newer list.
+  const [isChanging, setIsChanging] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocus(dialogRef, onClose);
 
   async function runAction(action: () => Promise<void>) {
     setErrorMessage(null);
+    setIsChanging(true);
     try {
       await action();
     } catch {
       setErrorMessage(ACTION_FAILED_MESSAGE);
+    } finally {
+      setIsChanging(false);
     }
   }
 
@@ -51,6 +59,7 @@ export function ShareDialog({
     <div className="overlay">
       <div
         className="dialog share-dialog"
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="share-title"
@@ -75,9 +84,14 @@ export function ShareDialog({
           <>
             <AddPersonForm
               candidates={listCandidates(users, access)}
+              isDisabled={isChanging}
               onAdd={handleAdd}
             />
-            <PeopleWithAccess access={access} onRemove={handleRemove} />
+            <PeopleWithAccess
+              access={access}
+              isDisabled={isChanging}
+              onRemove={handleRemove}
+            />
           </>
         ) : (
           !errorMessage && <p className="loading">Loading…</p>
@@ -92,16 +106,18 @@ export function ShareDialog({
 
 function AddPersonForm({
   candidates,
+  isDisabled,
   onAdd,
 }: {
   candidates: PublicUser[];
+  isDisabled: boolean;
   onAdd: (userId: string) => Promise<void>;
 }) {
   const [selectedUserId, setSelectedUserId] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (selectedUserId) {
+    if (selectedUserId && !isDisabled) {
       await onAdd(selectedUserId);
       setSelectedUserId("");
     }
@@ -128,7 +144,7 @@ function AddPersonForm({
         <button
           type="submit"
           className="button primary"
-          disabled={!selectedUserId}
+          disabled={!selectedUserId || isDisabled}
         >
           Add
         </button>
@@ -139,9 +155,11 @@ function AddPersonForm({
 
 function PeopleWithAccess({
   access,
+  isDisabled,
   onRemove,
 }: {
   access: DocumentAccessResponse;
+  isDisabled: boolean;
   onRemove: (user: PublicUser) => Promise<void>;
 }) {
   return (
@@ -159,6 +177,7 @@ function PeopleWithAccess({
               type="button"
               className="button"
               aria-label={`Remove ${user.displayName}`}
+              disabled={isDisabled}
               onClick={() => onRemove(user)}
             >
               Remove

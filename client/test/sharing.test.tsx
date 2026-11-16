@@ -135,6 +135,38 @@ describe("sharing in the editor", () => {
     expect(readPickerOptions(dialog)).toContain("Bob");
   });
 
+  it("moves focus into the dialog, keeps Tab inside, and Escape returns focus to Share", async () => {
+    const { user, dialog } = await openShareDialog();
+
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    for (let press = 0; press < 8; press += 1) {
+      await user.tab();
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    }
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toHaveFocus();
+  });
+
+  it("allows one sharing change at a time, so a slow response can't bring back someone removed", async () => {
+    mockedDocumentsApi.grantDocumentAccess.mockReturnValue(
+      new Promise(() => {}),
+    );
+    const { user, dialog } = await openShareDialog();
+
+    await user.selectOptions(
+      within(dialog).getByLabelText("Add people"),
+      "Carol",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(
+      within(dialog).getByRole("button", { name: "Remove Bob" }),
+    ).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+  });
+
   it("shows a message when sharing fails", async () => {
     mockedDocumentsApi.grantDocumentAccess.mockRejectedValue(
       new ApiError(500, "boom"),

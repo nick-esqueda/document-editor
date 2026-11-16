@@ -1,3 +1,6 @@
+import { useRef } from "react";
+import { useModalFocus } from "./useModalFocus";
+
 interface ConfirmDialogProps {
   title: string;
   message: string;
@@ -13,10 +16,14 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocus(dialogRef, onCancel);
+
   return (
     <div className="overlay">
       <div
         className="dialog"
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
