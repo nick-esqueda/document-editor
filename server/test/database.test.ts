@@ -11,7 +11,7 @@ async function listUserTables(
 ): Promise<string[]> {
   const result = await pool.query<{ table_name: string }>(
     `SELECT table_name FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name IN ('users', 'session', 'documents')
+     WHERE table_schema = 'public' AND table_name IN ('users', 'session', 'documents', 'document_access')
      ORDER BY table_name`,
   );
   return result.rows.map((row) => row.table_name);
@@ -21,7 +21,7 @@ describe("migrations", () => {
   const pool = useTestPool();
   const databaseUrl = getTestDatabaseUrl();
 
-  it("roll back and re-apply cleanly, including documents", async () => {
+  it("roll back and re-apply cleanly, including documents and access", async () => {
     await runMigrations(databaseUrl, "down");
     const tablesAfterDown = await listUserTables(pool);
 
@@ -30,7 +30,12 @@ describe("migrations", () => {
     const tablesAfterUp = await listUserTables(pool);
 
     expect(tablesAfterDown).toEqual([]);
-    expect(tablesAfterUp).toEqual(["documents", "session", "users"]);
+    expect(tablesAfterUp).toEqual([
+      "document_access",
+      "documents",
+      "session",
+      "users",
+    ]);
   });
 });
 

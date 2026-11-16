@@ -56,6 +56,10 @@ describe("documents API", () => {
     return result.rows[0].id;
   }
 
+  function readIds(documents: Array<{ id: string }>): string[] {
+    return documents.map((document) => document.id);
+  }
+
   it.each([
     ["get", DOCUMENTS_PATH],
     ["post", DOCUMENTS_PATH],
@@ -78,6 +82,8 @@ describe("documents API", () => {
       title: "Untitled document",
       content: { type: "doc", content: [{ type: "paragraph" }] },
       version: 1,
+      role: "owner",
+      ownerName: "Alice",
     });
     expect(response.body).not.toHaveProperty("ownerId");
     expect(await readOwnerId(response.body.id)).toBe(await readUserId("alice"));
@@ -106,14 +112,15 @@ describe("documents API", () => {
     const response = await request(app)
       .get(DOCUMENTS_PATH)
       .set("Cookie", aliceCookie);
-    const ids = response.body.map((document: { id: string }) => document.id);
+    const ids = readIds(response.body.owned);
 
     expect(ids.indexOf(older.id)).toBeLessThan(ids.indexOf(newer.id));
     expect(ids).not.toContain(bobsDocument.id);
-    expect(response.body[0]).toEqual({
+    expect(response.body.owned[0]).toEqual({
       id: older.id,
       title: "Edited last",
       updatedAt: expect.any(String),
+      sharedWithCount: 0,
     });
   });
 
@@ -221,9 +228,7 @@ describe("documents API", () => {
 
     expect(deleteResponse.status).toBe(204);
     expect(openResponse.status).toBe(404);
-    expect(
-      listResponse.body.map((document: { id: string }) => document.id),
-    ).not.toContain(created.id);
+    expect(readIds(listResponse.body.owned)).not.toContain(created.id);
   });
 
   it("gives another user 404 on open, save and delete, leaving the document unchanged", async () => {

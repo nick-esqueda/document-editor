@@ -61,3 +61,12 @@ export function toPublicUser(user: UserWithPasswordHash): PublicUser {
     displayName: user.displayName,
   };
 }
+
+/** Every user, for the share picker. Fine while users are a small seeded set. */
+export async function listPublicUsers(pool: DbPool): Promise<PublicUser[]> {
+  const result = await pool.query<PublicUser>(
+    `SELECT ${USER_COLUMNS} FROM users ORDER BY display_name`,
+  );
+
+  return result.rows;
+}

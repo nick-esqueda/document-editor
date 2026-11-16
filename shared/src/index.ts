@@ -1,7 +1,13 @@
 export type { PublicUser, LoginRequest, ApiErrorBody } from "./authTypes";
 export type {
   DocumentSummary,
+  OwnedDocumentSummary,
+  SharedDocumentSummary,
+  DocumentListResponse,
+  DocumentRole,
   DocumentDetails,
+  DocumentAccessResponse,
+  GrantAccessRequest,
   CreateDocumentResponse,
   UpdateDocumentRequest,
 } from "./documentTypes";

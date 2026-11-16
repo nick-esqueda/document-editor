@@ -8,6 +8,7 @@ import {
 } from "@doc-editor/shared";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HOME_PATH } from "../routes";
+import { ShareDialog } from "../sharing/ShareDialog";
 import { EditorToolbar } from "./EditorToolbar";
 import { EditorBanner } from "./EditorBanner";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
@@ -18,6 +19,9 @@ import { useAutosave } from "./useAutosave";
 export function DocumentEditor({ document }: { document: DocumentDetails }) {
   const { controller, status } = useAutosave(document.id, document.version);
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [title, setTitle] = useState(document.title);
+  const isOwner = document.role === "owner";
   const navigate = useNavigate();
 
   const editor = useEditor({
@@ -32,8 +36,9 @@ export function DocumentEditor({ document }: { document: DocumentDetails }) {
       }),
   });
 
-  function handleTitleCommit(title: string) {
-    controller.recordChange({ title });
+  function handleTitleCommit(newTitle: string) {
+    setTitle(newTitle);
+    controller.recordChange({ title: newTitle });
     void controller.saveNow();
   }
 
@@ -55,7 +60,19 @@ export function DocumentEditor({ document }: { document: DocumentDetails }) {
           initialTitle={document.title}
           onCommit={handleTitleCommit}
         />
+        {!isOwner && (
+          <span className="pill">Owned by {document.ownerName}</span>
+        )}
         <span className="spacer" />
+        {isOwner && (
+          <button
+            type="button"
+            className="button primary"
+            onClick={() => setIsShareDialogOpen(true)}
+          >
+            Share
+          </button>
+        )}
         <SaveStatusIndicator status={status} />
       </header>
       <EditorBanner status={status} />
@@ -63,6 +80,13 @@ export function DocumentEditor({ document }: { document: DocumentDetails }) {
       <main className="editor-canvas">
         <EditorContent editor={editor} />
       </main>
+      {isShareDialogOpen && (
+        <ShareDialog
+          documentId={document.id}
+          documentTitle={title}
+          onClose={() => setIsShareDialogOpen(false)}
+        />
+      )}
       {isLeaveDialogOpen && (
         <ConfirmDialog
           title="Leave without saving?"

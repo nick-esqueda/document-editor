@@ -5,6 +5,7 @@ import * as authApi from "../src/api/authApi";
 import * as documentsApi from "../src/api/documentsApi";
 import { ApiError } from "../src/api/httpClient";
 import { ALICE, renderAppAt } from "./renderWithAuth";
+import { EMPTY_DOCUMENT_LISTS } from "./documentFixtures";
 
 vi.mock("../src/api/authApi");
 vi.mock("../src/api/documentsApi");
@@ -21,7 +22,7 @@ async function fillInLoginForm(username: string, password: string) {
 beforeEach(() => {
   vi.resetAllMocks();
   mockedAuthApi.fetchCurrentUser.mockResolvedValue(null);
-  mockedDocumentsApi.listDocuments.mockResolvedValue([]);
+  mockedDocumentsApi.listDocuments.mockResolvedValue(EMPTY_DOCUMENT_LISTS);
 });
 
 describe("LoginPage", () => {

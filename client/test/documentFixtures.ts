@@ -1,4 +1,9 @@
-import type { DocumentDetails } from "@doc-editor/shared";
+import type { DocumentDetails, DocumentListResponse } from "@doc-editor/shared";
+
+export const EMPTY_DOCUMENT_LISTS: DocumentListResponse = {
+  owned: [],
+  shared: [],
+};
 
 export function buildDocumentDetails(
   overrides: Partial<DocumentDetails> = {},
@@ -8,6 +13,8 @@ export function buildDocumentDetails(
     title: "Untitled document",
     updatedAt: new Date().toISOString(),
     version: 1,
+    role: "owner",
+    ownerName: "Alice",
     content: { type: "doc", content: [{ type: "paragraph" }] },
     ...overrides,
   };

@@ -19,6 +19,8 @@ function buildSavedDocument(version: number): DocumentDetails {
     title: "Doc",
     updatedAt: new Date().toISOString(),
     version,
+    role: "owner",
+    ownerName: "Alice",
     content: { type: "doc", content: [] },
   };
 }

@@ -7,14 +7,17 @@ import {
   type RefObject,
 } from "react";
 import { Link } from "react-router";
-import { MAX_TITLE_LENGTH, type DocumentSummary } from "@doc-editor/shared";
+import {
+  MAX_TITLE_LENGTH,
+  type OwnedDocumentSummary,
+} from "@doc-editor/shared";
 import { buildDocumentPath } from "../routes";
 import { formatEditedTime } from "./formatEditedTime";
 
 interface DocumentRowProps {
-  document: DocumentSummary;
-  onRename: (document: DocumentSummary, title: string) => void;
-  onRequestDelete: (document: DocumentSummary) => void;
+  document: OwnedDocumentSummary;
+  onRename: (document: OwnedDocumentSummary, title: string) => void;
+  onRequestDelete: (document: OwnedDocumentSummary) => void;
 }
 
 type RowMode = "idle" | "menuOpen" | "renaming";
@@ -52,6 +55,9 @@ export function DocumentRow({
         <Link className="document-title" to={buildDocumentPath(document.id)}>
           {document.title}
         </Link>
+      )}
+      {document.sharedWithCount > 0 && (
+        <span className="pill">👥 Shared with {document.sharedWithCount}</span>
       )}
       <span className="spacer" />
       <span className="meta">{formatEditedTime(document.updatedAt)}</span>

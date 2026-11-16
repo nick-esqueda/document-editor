@@ -6,24 +6,27 @@ import {
   validateDocumentContent,
   type DocumentDetails,
   type DocumentJson,
+  type DocumentListResponse,
+  type DocumentRole,
 } from "@doc-editor/shared";
 import type { DbPool } from "../db/pool";
 import {
   deleteDocument,
   insertDocument,
+  listDocumentsSharedWith,
   listOwnedDocuments,
   updateDocumentIfVersionMatches,
   type DocumentChanges,
-  type DocumentWithOwner,
+  type DocumentRecord,
 } from "../db/documentQueries";
 import {
-  getAccessibleDocument,
-  type AccessibleDocument,
-} from "../documents/documentAccess";
+  findDocumentOrRespond404,
+  isOwnerOrRespond403,
+  readUserId,
+} from "../documents/documentRequests";
 import { requireAuth } from "../auth/requireAuth";
 import { sendError } from "../http/sendError";
-
-const NOT_FOUND_MESSAGE = "Document not found";
+import { createAccessRouter } from "./accessRoutes";
 const STALE_VERSION_MESSAGE =
   "This document was changed elsewhere. Reload to see the latest version.";
 
@@ -59,38 +62,18 @@ export function createDocumentRouter(pool: DbPool): Router {
   router.delete("/:id", (request, response) =>
     handleDeleteDocument(pool, request, response),
   );
+  router.use("/:id/access", createAccessRouter(pool));
 
   return router;
 }
 
-function readUserId(request: Request): string {
-  return request.session.userId as string;
-}
-
 /** Removes server-only fields before sending a document to the browser. */
-function toDocumentDetails(document: DocumentWithOwner): DocumentDetails {
-  const { id, title, content, version, updatedAt } = document;
-  return { id, title, content, version, updatedAt };
-}
-
-/** Looks up the document the URL names, answering 404 itself when the user can't access it. */
-async function findDocumentOrRespond404(
-  pool: DbPool,
-  request: Request,
-  response: Response,
-): Promise<AccessibleDocument | null> {
-  const documentId = String(request.params.id);
-  const accessible = await getAccessibleDocument(
-    pool,
-    readUserId(request),
-    documentId,
-  );
-
-  if (!accessible) {
-    sendError(response, 404, NOT_FOUND_MESSAGE);
-  }
-
-  return accessible;
+function toDocumentDetails(
+  document: DocumentRecord,
+  role: DocumentRole,
+): DocumentDetails {
+  const { id, title, content, version, updatedAt, ownerName } = document;
+  return { id, title, content, version, updatedAt, ownerName, role };
 }
 
 async function handleListDocuments(
@@ -98,8 +81,14 @@ async function handleListDocuments(
   request: Request,
   response: Response,
 ) {
-  const documents = await listOwnedDocuments(pool, readUserId(request));
-  response.json(documents);
+  const userId = readUserId(request);
+  const [owned, shared] = await Promise.all([
+    listOwnedDocuments(pool, userId),
+    listDocumentsSharedWith(pool, userId),
+  ]);
+  const body: DocumentListResponse = { owned, shared };
+
+  response.json(body);
 }
 
 async function handleCreateDocument(
@@ -112,7 +101,7 @@ async function handleCreateDocument(
     readUserId(request),
     EMPTY_DOCUMENT,
   );
-  response.status(201).json(toDocumentDetails(document));
+  response.status(201).json(toDocumentDetails(document, "owner"));
 }
 
 async function handleGetDocument(
@@ -123,7 +112,7 @@ async function handleGetDocument(
   const accessible = await findDocumentOrRespond404(pool, request, response);
 
   if (accessible) {
-    response.json(toDocumentDetails(accessible.document));
+    response.json(toDocumentDetails(accessible.document, accessible.role));
   }
 }
 
@@ -158,7 +147,7 @@ async function handleUpdateDocument(
     return;
   }
 
-  response.json(toDocumentDetails(updated));
+  response.json(toDocumentDetails(updated, accessible.role));
 }
 
 /** Validates a save request, answering 400 itself when it's invalid. */
@@ -208,8 +197,12 @@ async function handleDeleteDocument(
     return;
   }
 
-  if (accessible.role !== "owner") {
-    sendError(response, 403, "Only the owner can delete this document");
+  const isOwner = isOwnerOrRespond403(
+    accessible,
+    response,
+    "Only the owner can delete this document",
+  );
+  if (!isOwner) {
     return;
   }
 

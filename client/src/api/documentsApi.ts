@@ -1,7 +1,9 @@
 import type {
   CreateDocumentResponse,
+  DocumentAccessResponse,
   DocumentDetails,
-  DocumentSummary,
+  DocumentListResponse,
+  GrantAccessRequest,
   UpdateDocumentRequest,
 } from "@doc-editor/shared";
 import { requestJson } from "./httpClient";
@@ -12,8 +14,8 @@ function buildDocumentApiPath(documentId: string): string {
   return `${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}`;
 }
 
-export function listDocuments(): Promise<DocumentSummary[]> {
-  return requestJson<DocumentSummary[]>(DOCUMENTS_PATH);
+export function listDocuments(): Promise<DocumentListResponse> {
+  return requestJson<DocumentListResponse>(DOCUMENTS_PATH);
 }
 
 export function createDocument(): Promise<CreateDocumentResponse> {
@@ -40,6 +42,35 @@ export function deleteDocument(documentId: string): Promise<void> {
   return requestJson<void>(buildDocumentApiPath(documentId), {
     method: "DELETE",
   });
+}
+
+function buildAccessApiPath(documentId: string): string {
+  return `${buildDocumentApiPath(documentId)}/access`;
+}
+
+export function fetchDocumentAccess(
+  documentId: string,
+): Promise<DocumentAccessResponse> {
+  return requestJson<DocumentAccessResponse>(buildAccessApiPath(documentId));
+}
+
+export function grantDocumentAccess(
+  documentId: string,
+  userId: string,
+): Promise<DocumentAccessResponse> {
+  const body: GrantAccessRequest = { userId };
+  return requestJson<DocumentAccessResponse>(buildAccessApiPath(documentId), {
+    method: "POST",
+    body,
+  });
+}
+
+export function revokeDocumentAccess(
+  documentId: string,
+  userId: string,
+): Promise<void> {
+  const path = `${buildAccessApiPath(documentId)}/${encodeURIComponent(userId)}`;
+  return requestJson<void>(path, { method: "DELETE" });
 }
 
 /**
