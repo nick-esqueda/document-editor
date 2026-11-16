@@ -7,6 +7,7 @@
 **What you get:** an Upload button on the document list (drag and drop works too), labelled "Supports .txt and .md, up to 1 MB". The uploaded file becomes a new document you own and opens straight in the editor.
 
 **How it's built:**
+
 - The file goes to the server, which checks the type and size and rejects anything that isn't real text.
 - Markdown is converted with markdown-it, with raw HTML turned off, then into Tiptap JSON. Plain text becomes paragraphs.
 - The result passes the same schema check as normal saves, so an upload can't sneak in anything the editor wouldn't allow.
@@ -46,52 +47,34 @@ browser ──multipart──▶ POST /api/documents/import
 - **Conversion happens on the server**, using Tiptap's server-side `generateJSON` with the same extension list as the editor. Stored content is always valid editor JSON.
 - **`html: false` in markdown-it** means raw HTML inside markdown is treated as text, never executed. The schema step is a second safety net.
 - **Title** = filename without extension (e.g. `meeting-notes.md` → "meeting-notes").
-- **Lossy by design:** markdown features the editor doesn't support are simplified. H4-H6 → H3, code blocks and blockquotes → paragraphs, tables → text, links → link text, images → dropped. The upload response includes a `warnings` count, and the UI shows *"Some formatting wasn't supported and was simplified."*
+- **Lossy by design:** markdown features the editor doesn't support are simplified. H4-H6 → H3, code blocks and blockquotes → paragraphs, tables → text, links → link text, images → dropped. The upload response includes a `warnings` count, and the UI shows _"Some formatting wasn't supported and was simplified."_
 - multer with memory storage and a 1 MB limit. Nothing is written to disk.
 
 ## API
 
-| Method | Route | Notes |
-|---|---|---|
-| POST | `/api/documents/import` | multipart field `file`. 201 `{id, warnings}` · 400 bad type/encoding · 413 too large |
+| Method | Route                   | Notes                                                                                |
+| ------ | ----------------------- | ------------------------------------------------------------------------------------ |
+| POST   | `/api/documents/import` | multipart field `file`. 201 `{id, warnings}` · 400 bad type/encoding · 413 too large |
 
 ## Wireframes
 
-**Document list with upload**
-```text
-┌────────────────────────────────────────────────────┐
-│ 📄 DocEditor                      Alice ▾ [Log out] │
-├────────────────────────────────────────────────────┤
-│  My documents      [ ⬆ Upload ]  [ + New document ] │
-│                    Supports .txt and .md, up to 1 MB│
-│  ─────────────────────────────────────────────────  │
-│  📄 meeting-notes                Edited just now  ⋮ │
-│  📄 Q3 planning notes            Edited 2 min ago ⋮ │
-│  …                                                 │
-└────────────────────────────────────────────────────┘
-```
-Clicking **Upload** opens the file picker filtered to `.txt,.md`. Dropping a file anywhere on the list also works.
+Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
 
-**Upload states** (toast, bottom of the screen)
-```text
- ┌────────────────────────────────────┐
- │ ⏳ Importing meeting-notes.md…      │
- └────────────────────────────────────┘
- ┌────────────────────────────────────────────────┐
- │ ✕ "report.docx" isn't supported.               │
- │   Upload a .txt or .md file.                   │
- └────────────────────────────────────────────────┘
- ┌────────────────────────────────────────────────┐
- │ ✕ "huge.md" is larger than 1 MB.               │
- └────────────────────────────────────────────────┘
-```
-On success the new document opens in the editor. If anything was simplified, a dismissible note sits above the toolbar:
-```text
-┌────────────────────────────────────────────────────┐
-│ ℹ Imported from meeting-notes.md. Some formatting   │
-│   wasn't supported and was simplified.        [ ✕ ]│
-└────────────────────────────────────────────────────┘
-```
+**Upload button and supported types, import in progress**
+
+![Upload button and supported types, import in progress](../wireframes/phase-4-document-list-upload.png)
+
+**Drag and drop**
+
+![Drag and drop](../wireframes/phase-4-drag-and-drop.png)
+
+**Unsupported file**
+
+![Unsupported file](../wireframes/phase-4-upload-error.png)
+
+**Imported document with the simplification note**
+
+![Imported document with the simplification note](../wireframes/phase-4-imported-document.png)
 
 ## Testing
 

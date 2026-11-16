@@ -7,21 +7,22 @@
 **What you get:** a "My documents" list with a New document button. Each doc opens in a Tiptap editor with a toolbar for bold, italic, underline, H1-H3 and bulleted/numbered lists. Click the title to rename it. Changes autosave and the header shows Saving… / Saved / Offline, retrying. Close the tab, come back, and everything is still there.
 
 **How it's built:**
+
 - A `documents` table stores the title and the content as Tiptap JSON (`jsonb`), never HTML.
 - The server checks every save against the same editor schema the browser uses and rejects anything unknown, so stored content can't carry scripts.
-- Autosave fires 1 second after you stop typing (at least every 5 seconds while typing).
+- Autosave fires once, 1 second after you stop typing (and at most every 5 seconds during long typing). It only saves when something changed, so an idle document makes no save calls.
 - Each save sends a version number. If someone else saved first (possible once sharing exists), you get a "changed elsewhere, reload" banner instead of silently overwriting their work.
 - If you don't own a doc, the API answers 404 as if it doesn't exist.
 
 **Deliberately not included:** sharing, upload, comments, version history, images, tables, links.
 
-**Decision for you:** should owners be able to delete docs? I'll include owner-only delete with a confirm dialog unless you say no.
+**Decided:** owners can delete their own docs (with a confirm dialog), even when shared. Nobody else can.
 
 ---
 
 ## Scope
 
-document list (owned docs), create, rename, open, Tiptap editor with toolbar, debounced autosave, save status, version conflict check, owner-only delete *(default, see open questions)*.
+document list (owned docs), create, rename, open, Tiptap editor with toolbar, debounced autosave, save status, version conflict check, owner-only delete _(default, see open questions)_.
 
 ## Out of scope
 
@@ -44,13 +45,13 @@ index on documents(owner_id, updated_at desc)
 
 ## API
 
-| Method | Route | Who | Notes |
-|---|---|---|---|
-| GET | `/api/documents` | logged in | owned docs, newest first (no content) |
-| POST | `/api/documents` | logged in | creates empty doc, returns it |
-| GET | `/api/documents/:id` | has access | title, content, version |
-| PATCH | `/api/documents/:id` | has access | `{title?, content?, version}` → 409 if version is stale |
-| DELETE | `/api/documents/:id` | owner | |
+| Method | Route                | Who        | Notes                                                   |
+| ------ | -------------------- | ---------- | ------------------------------------------------------- |
+| GET    | `/api/documents`     | logged in  | owned docs, newest first (no content)                   |
+| POST   | `/api/documents`     | logged in  | creates empty doc, returns it                           |
+| GET    | `/api/documents/:id` | has access | title, content, version                                 |
+| PATCH  | `/api/documents/:id` | has access | `{title?, content?, version}` → 409 if version is stale |
+| DELETE | `/api/documents/:id` | owner      |                                                         |
 
 **Access check:** one helper, `getAccessibleDoc(userId, docId)`, used by every `:id` route. In this phase it means "owner". Phase 3 widens it to "owner or granted". No access returns **404**, not 403, so IDs don't reveal that a doc exists.
 
@@ -62,58 +63,36 @@ Tiptap with only what we need: paragraph, heading (H1-H3), bold, italic, underli
 
 ## Autosave
 
-- Save 1 s after typing stops, and at least every 5 s while typing continues.
+- Save once, 1 s after typing stops, and at most every 5 s while typing continues.
+- Only save when there are unsaved changes. After a successful save nothing runs until the next edit, so an open but idle document sends no requests. A failed save retries with backoff until it succeeds.
 - Title saves on blur / Enter.
 - Status in the header: **Saving…** → **Saved** → **Offline, retrying** (exponential backoff).
 - On tab close with unsaved changes: one last `fetch(..., {keepalive: true})` plus the browser "leave page?" prompt.
-- **Conflict:** each save sends the `version` it was based on. If someone else saved in between (possible after Phase 3), the server returns 409 and the editor shows a banner: *"This document was changed elsewhere. Reload to see the latest version."* Your unsaved text is kept in the editor so you can copy it. Simple, and nothing gets silently overwritten.
+- **Conflict:** each save sends the `version` it was based on. If someone else saved in between (possible after Phase 3), the server returns 409 and the editor shows a banner: _"This document was changed elsewhere. Reload to see the latest version."_ Your unsaved text is kept in the editor so you can copy it. Simple, and nothing gets silently overwritten.
 
 ## Wireframes
 
-**Document list**
-```text
-┌────────────────────────────────────────────────────┐
-│ 📄 DocEditor                      Alice ▾ [Log out] │
-├────────────────────────────────────────────────────┤
-│  My documents                   [ + New document ] │
-│  ─────────────────────────────────────────────────  │
-│  📄 Q3 planning notes            Edited 2 min ago ⋮ │
-│  📄 Untitled document            Edited yesterday ⋮ │
-│  📄 Reading list                 Edited Nov 10    ⋮ │
-│                                    ⋮ → Rename       │
-│                                        Delete       │
-│                                                    │
-│  (empty state: "No documents yet. Create one.")    │
-└────────────────────────────────────────────────────┘
-```
+Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
 
-**Editor**
-```text
-┌────────────────────────────────────────────────────┐
-│ ← Documents   [ Q3 planning notes        ]  ✓ Saved │
-│               ↑ click title to rename               │
-├────────────────────────────────────────────────────┤
-│ [Normal ▾] │ B  I  U │ • List  1. List │ ↶ ↷        │
-│  Normal / H1 / H2 / H3                              │
-├────────────────────────────────────────────────────┤
-│                                                    │
-│   Q3 Planning                     ← H1             │
-│                                                    │
-│   Goals for the quarter:                           │
-│    • Ship sharing                                  │
-│    • **Deploy** to AWS                             │
-│                                                    │
-│   |                               ← cursor         │
-│                                                    │
-└────────────────────────────────────────────────────┘
-```
+**Document list, with a row's menu open**
 
-**Conflict banner** (top of the editor)
-```text
-┌────────────────────────────────────────────────────┐
-│ ⚠ This document was changed elsewhere.  [ Reload ] │
-└────────────────────────────────────────────────────┘
-```
+![Document list, with a row's menu open](../wireframes/phase-2-document-list.png)
+
+**Empty list**
+
+![Empty list](../wireframes/phase-2-document-list-empty.png)
+
+**Editor (title focused for renaming)**
+
+![Editor (title focused for renaming)](../wireframes/phase-2-editor.png)
+
+**Save status while the server is unreachable**
+
+![Save status while the server is unreachable](../wireframes/phase-2-editor-offline.png)
+
+**Edit conflict banner**
+
+![Edit conflict banner](../wireframes/phase-2-editor-conflict.png)
 
 ## Testing
 
@@ -121,8 +100,8 @@ API tests: create/list/get/patch; another user gets 404 on every route; invalid 
 
 ## Open questions
 
-- **Delete:** include owner-only delete? *Default: yes.*
-- **Trash/undo delete:** *Default: no, a confirm dialog is enough.*
+- ~~**Delete:** include owner-only delete?~~ **Decided (Nick):** yes. Only the owner can delete, even when the doc is shared. Deleting a shared doc removes it for everyone it was shared with.
+- ~~**Trash/undo delete:**~~ **Decided (Nick):** no. A confirm dialog is enough.
 
 ## Acceptance criteria
 

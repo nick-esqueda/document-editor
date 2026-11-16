@@ -7,6 +7,7 @@
 **What you get:** a Share button (owner only) opens a dialog where you pick a user and add or remove them. Anyone you share with can open and edit the doc. The list now has two sections, **My documents** and **Shared with me**, and shared docs show who owns them.
 
 **How it's built:**
+
 - A `document_access` table records who was given access to which doc.
 - The access check from Phase 2 widens from "owner" to "owner or given access". It's one helper used by every route, so there's a single place to get it right.
 - Only the owner can share, unshare or delete. Shared users get 403 if they try, and everyone else still gets 404.
@@ -42,27 +43,27 @@ index on document_access(user_id)
 
 ## Rules
 
-| Action | Owner | User with access | Anyone else |
-|---|---|---|---|
-| Open, edit content | ✓ | ✓ | 404 |
-| Rename | ✓ | ✓ *(default)* | 404 |
-| See who has access | ✓ | ✓ (read-only list) | 404 |
-| Grant / revoke access | ✓ | ✗ (403) | 404 |
-| Delete document | ✓ | ✗ (403) | 404 |
+| Action                | Owner | User with access   | Anyone else |
+| --------------------- | ----- | ------------------ | ----------- |
+| Open, edit content    | ✓     | ✓                  | 404         |
+| Rename                | ✓     | ✓ _(default)_      | 404         |
+| See who has access    | ✓     | ✓ (read-only list) | 404         |
+| Grant / revoke access | ✓     | ✗ (403)            | 404         |
+| Delete document       | ✓     | ✗ (403)            | 404         |
 
 - An owner can't share with themselves; sharing twice is a no-op.
-- Revoking takes effect on the next request. If the revoked user has the doc open, their next save gets 404 and the editor shows *"You no longer have access to this document."*
+- Revoking takes effect on the next request. If the revoked user has the doc open, their next save gets 404 and the editor shows _"You no longer have access to this document."_
 - Two people editing at once is handled by the Phase 2 version check (409 + reload banner).
 
 ## API
 
-| Method | Route | Who |
-|---|---|---|
-| GET | `/api/documents` | logged in → now returns `{ owned: [...], shared: [...] }`; shared items include owner's name |
-| GET | `/api/users` | logged in → `id, username, displayName` for the share picker |
-| GET | `/api/documents/:id/access` | owner or access |
-| POST | `/api/documents/:id/access` | owner → `{ userId }` |
-| DELETE | `/api/documents/:id/access/:userId` | owner |
+| Method | Route                               | Who                                                                                          |
+| ------ | ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| GET    | `/api/documents`                    | logged in → now returns `{ owned: [...], shared: [...] }`; shared items include owner's name |
+| GET    | `/api/users`                        | logged in → `id, username, displayName` for the share picker                                 |
+| GET    | `/api/documents/:id/access`         | owner or access                                                                              |
+| POST   | `/api/documents/:id/access`         | owner → `{ userId }`                                                                         |
+| DELETE | `/api/documents/:id/access/:userId` | owner                                                                                        |
 
 `getAccessibleDoc` becomes one SQL query (`owner_id = $user OR EXISTS access row`) and also returns the caller's role (`owner` / `editor`), so routes can check ownership without a second query.
 
@@ -70,51 +71,23 @@ Listing all users is fine here because users are a small seeded set. With real s
 
 ## Wireframes
 
-**Document list**
-```text
-┌────────────────────────────────────────────────────┐
-│ 📄 DocEditor                      Alice ▾ [Log out] │
-├────────────────────────────────────────────────────┤
-│  My documents                   [ + New document ] │
-│  ─────────────────────────────────────────────────  │
-│  📄 Q3 planning notes   👥 2      Edited 2 min ago ⋮ │
-│  📄 Reading list                  Edited Nov 10    ⋮ │
-│                                                    │
-│  Shared with me                                    │
-│  ─────────────────────────────────────────────────  │
-│  📄 Team retro         from Bob   Edited 1 hr ago   │
-│  📄 Launch checklist   from Carol Edited Nov 12     │
-│                                                    │
-│  (empty: "Nothing shared with you yet.")           │
-└────────────────────────────────────────────────────┘
-```
-`👥 2` = shared with 2 people.
+Rendered mockups. The layout and wording are what I'll build; colors and spacing may shift slightly.
 
-**Share dialog** (opened from a **Share** button in the editor header, or ⋮ → Share in the list; owner only)
-```text
-        ┌──────────────────────────────────────┐
-        │ Share "Q3 planning notes"         ✕  │
-        ├──────────────────────────────────────┤
-        │ Add people                           │
-        │ [ Select a user…             ▾ ] [Add]│
-        │    Bob                               │
-        │    Carol                             │
-        │                                      │
-        │ People with access                   │
-        │  Alice (you)              Owner      │
-        │  Bob                      [Remove]   │
-        │                                      │
-        │ People with access can view and edit.│
-        └──────────────────────────────────────┘
-```
+**Owned vs shared documents**
 
-**Editor header, opened by someone it was shared with**
-```text
-┌────────────────────────────────────────────────────┐
-│ ← Documents   [ Team retro ]  Owned by Bob ✓ Saved │
-└────────────────────────────────────────────────────┘
-```
-No Share or Delete for non-owners. Instead they see "Owned by …", and clicking it shows the read-only list of people with access.
+![Owned vs shared documents](../wireframes/phase-3-document-list.png)
+
+**Share dialog (owner only)**
+
+![Share dialog (owner only)](../wireframes/phase-3-share-dialog.png)
+
+**Editor opened by someone it was shared with (no Share or Delete)**
+
+![Editor opened by someone it was shared with (no Share or Delete)](../wireframes/phase-3-editor-shared-user.png)
+
+**Access removed while the doc is open**
+
+![Access removed while the doc is open](../wireframes/phase-3-editor-access-removed.png)
 
 ## Testing
 
@@ -122,8 +95,8 @@ API matrix test covering every row of the rules table for owner, granted user an
 
 ## Open questions
 
-- **Can shared users rename?** *Default: yes.*
-- **Can a shared user remove themselves ("leave")?** *Default: no, keep it simple.*
+- **Can shared users rename?** _Default: yes._
+- **Can a shared user remove themselves ("leave")?** _Default: no, keep it simple._
 
 ## Acceptance criteria
 
