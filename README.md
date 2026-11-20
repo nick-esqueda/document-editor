@@ -61,6 +61,16 @@ The code is also at https://github.com/nick-esqueda/document-editor. You need [G
 
 To get later changes, run `git pull`, then `docker compose up --build --renew-anon-volumes`. That flag refreshes the installed packages in case dependencies changed, and keeps your database.
 
+## Architecture
+
+![Architecture diagram: the browser (web tier) talks over HTTPS to one Express service on Render (API tier), which reads and writes Render Postgres (database tier)](architecture.svg)
+
+- **Web tier:** the React + TypeScript app with the Tiptap editor, running in the browser.
+- **API tier:** one Docker web service on Render. Express answers `/api/*` with JSON and serves the built React app for every other path, so everything is on one domain.
+- **Database tier:** Render Postgres 16, reachable only from the web service. Documents are stored as Tiptap JSON in `jsonb`.
+
+Locally, `docker compose` runs the same tiers as separate containers. The source file is [architecture.svg](architecture.svg).
+
 ## Importing files
 
 The **Upload** button on the document list (or dragging a file onto the list) turns a file into a new document you own.
