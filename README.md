@@ -6,7 +6,7 @@ A lightweight collaborative document editor: log in, write formatted documents, 
 
 Use this if you were sent the code as a Google Drive link.
 
-**Google Drive link:** `TODO: add the Google Drive link here`
+**Google Drive link:** https://drive.google.com/drive/folders/1TWlddrxMzSpzA_2BHCtoxRvU4AUXmFml?usp=drive_link
 
 ### What you need
 
