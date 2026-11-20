@@ -38,7 +38,7 @@ The defaults work as-is for local use. `SEED_PASSWORD` is the password every dem
 docker compose up --build
 ```
 
-The first run takes a few minutes to build. Compose starts Postgres, the API (port 3000, runs migrations and the seed on start) and the Vite dev server (port 5173, forwards `/api` to the API). The app is ready when the logs show the Vite dev server URL.
+The first run takes a few minutes to build. Compose starts Postgres, the API (port 3000, runs migrations and the seed on start) and the Vite dev server (port 5173, forwards `/api` to the API). Wait until the logs show both the Vite dev server URL and `API listening on http://localhost:3000` before logging in.
 
 ### 4. Log in
 
@@ -59,7 +59,7 @@ The code is also at https://github.com/nick-esqueda/document-editor. You need [G
 
 2. Follow the Google Drive setup from [step 2, Create your `.env` file](#2-create-your-env-file) onward: copy `.env.example` to `.env`, run `docker compose up --build`, and log in at http://localhost:5173.
 
-To get later changes, run `git pull`, then `docker compose up --build` again.
+To get later changes, run `git pull`, then `docker compose up --build --renew-anon-volumes`. That flag refreshes the installed packages in case dependencies changed, and keeps your database.
 
 ## Importing files
 
