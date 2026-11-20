@@ -2,18 +2,64 @@
 
 A lightweight collaborative document editor: log in, write formatted documents, share them, and import `.txt`/`.md` files. Built in phases, see [docs/PLAN-SUMMARY.md](docs/PLAN-SUMMARY.md). This README grows into the full guide in Phase 5.
 
-## Run it locally
+## Set up locally from Google Drive
 
-Requires Docker.
+Use this if you were sent the code as a Google Drive link.
+
+**Google Drive link:** `TODO: add the Google Drive link here`
+
+### What you need
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with the Compose plugin), running.
+- Ports 5173, 3000 and 5432 free on your machine.
+
+Node isn't needed for this setup; everything runs in containers.
+
+### 1. Download and unzip the code
+
+1. Open the Google Drive link, then use **Download** on the `document-editor` folder. Drive zips the folder for you. Large folders can arrive as several zip files; unzip all of them into the same folder.
+2. Unzip it somewhere convenient and open a terminal in the unzipped `document-editor` folder (the one that contains `docker-compose.yml`):
+
+   ```sh
+   cd path/to/document-editor
+   ```
+
+### 2. Create your `.env` file
 
 ```sh
 cp .env.example .env
+```
+
+The defaults work as-is for local use. `SEED_PASSWORD` is the password every demo user gets, so change it if you like. `.env` is hidden in Finder and Explorer because its name starts with a dot; the command above works regardless.
+
+### 3. Start the app
+
+```sh
 docker compose up --build
 ```
 
-Open http://localhost:5173 and log in as `alice`, `bob` or `carol` with the `SEED_PASSWORD` from your `.env`.
+The first run takes a few minutes to build. Compose starts Postgres, the API (port 3000, runs migrations and the seed on start) and the Vite dev server (port 5173, forwards `/api` to the API). The app is ready when the logs show the Vite dev server URL.
 
-Compose starts Postgres, the API (port 3000, runs migrations and the seed on start) and the Vite dev server (port 5173, forwards `/api` to the API).
+### 4. Log in
+
+Open http://localhost:5173 and log in as `alice`, `bob` or `carol` with the `SEED_PASSWORD` from your `.env` (`change-me-dev-password` unless you changed it). Log in as two of them in different browsers to try sharing.
+
+To stop the app, press Ctrl+C, or run `docker compose down`. Your documents are kept in a Docker volume; `docker compose down -v` deletes them and starts fresh next time.
+
+## Set up locally from GitHub
+
+The code is also at https://github.com/nick-esqueda/document-editor. You need [Git](https://git-scm.com/downloads) plus the same prerequisites as [the Google Drive setup](#what-you-need).
+
+1. Clone the repository and go into it:
+
+   ```sh
+   git clone https://github.com/nick-esqueda/document-editor.git
+   cd document-editor
+   ```
+
+2. Follow the Google Drive setup from [step 2, Create your `.env` file](#2-create-your-env-file) onward: copy `.env.example` to `.env`, run `docker compose up --build`, and log in at http://localhost:5173.
+
+To get later changes, run `git pull`, then `docker compose up --build` again.
 
 ## Importing files
 
